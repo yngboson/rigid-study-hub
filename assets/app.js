@@ -160,11 +160,11 @@ async function viewRead(u, params) {
   const toc = (list) => '<ol>' + list.map(s => `<li><a href="#/${u.cid}/${u.uid}/read?s=${encodeURIComponent(s.id)}" data-toc="${esc(s.id)}"><span class="sid">§${esc(s.id)}</span>${esc(s.title)}</a>${s.sections?.length ? toc(s.sections) : ''}</li>`).join('') + '</ol>';
   main.innerHTML = `<div class="wrap">${unitHead(u, 'read')}
     <div class="toolbar">
-      <button class="btn toc-toggle" id="tocBtn" aria-expanded="false">목차</button>
+      <button class="btn toc-toggle" id="tocBtn" aria-expanded="false" aria-controls="toc">☰ 목차</button>
       <input class="search" id="q" type="search" placeholder="개념 검색 (용어, 키워드)" aria-label="개념 검색">
       <div class="seg" role="group" aria-label="형광펜 보기"><button data-m="show" aria-pressed="true">형광펜 보기</button><button data-m="hide" aria-pressed="false">가리기(암기)</button></div>
       <span class="grow"></span><span class="kbd" id="hitInfo"></span></div>
-    <div class="reader"><nav class="toc" id="toc" aria-label="목차">${toc(u.data.summary)}</nav>
+    <div class="toc-backdrop" id="tocBd"></div><div class="reader" id="reader"><nav class="toc" id="toc" aria-label="목차">${toc(u.data.summary)}</nav>
     <article class="doc" id="doc">${u.data.summary.map(s => renderSection(u, s)).join('')}</article></div></div>`;
   const doc = $('#doc');
   // 형광펜 가리기 모드: 눌러서 잠깐 확인
@@ -173,12 +173,23 @@ async function viewRead(u, params) {
     if (b.dataset.m === 'hide') toast('형광펜 부분을 눌러 확인하세요');
   });
   doc.addEventListener('click', e => { const m = e.target.closest('mark'); if (m && doc.classList.contains('hide-marks')) m.classList.toggle('peek'); });
-  $('#tocBtn').onclick = e => { const t = $('#toc').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', t); };
+  const mobile = () => matchMedia('(max-width:960px)').matches;
+  const rd = $('#reader'), tocEl = $('#toc'), bd = $('#tocBd'), tb = $('#tocBtn');
+  let hid = false; try { hid = localStorage.getItem('rsh:toc') === 'hidden'; } catch {}
+  const sync = () => { const open = mobile() ? tocEl.classList.contains('open') : !rd.classList.contains('toc-hidden'); tb.setAttribute('aria-expanded', open); bd.classList.toggle('open', mobile() && open); };
+  if (hid && !mobile()) rd.classList.add('toc-hidden');
+  tb.onclick = () => {
+    if (mobile()) tocEl.classList.toggle('open');
+    else { const h = rd.classList.toggle('toc-hidden'); try { localStorage.setItem('rsh:toc', h ? 'hidden' : 'shown'); } catch {} }
+    sync();
+  };
+  bd.onclick = () => { tocEl.classList.remove('open'); sync(); };
+  sync();
   // 목차 현재 위치
   const links = new Map($$('#toc a').map(a => [a.dataset.toc, a]));
   const io = new IntersectionObserver(es => { for (const en of es) if (en.isIntersecting) { $$('#toc a.active').forEach(a => a.classList.remove('active')); links.get(en.target.dataset.sid)?.classList.add('active'); } }, { rootMargin: '-80px 0px -75% 0px' });
   $$('#doc section').forEach(s => io.observe(s));
-  $('#toc').addEventListener('click', e => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); jumpTo(a.dataset.toc); if (matchMedia('(max-width:960px)').matches) $('#toc').classList.remove('open'); });
+  $('#toc').addEventListener('click', e => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); jumpTo(a.dataset.toc); if (mobile()) { tocEl.classList.remove('open'); sync(); } });
   // 검색
   const input = $('#q');
   input.addEventListener('input', () => {
@@ -249,16 +260,16 @@ async function viewQuiz(u, params) {
     <div class="set-pick" role="tablist" aria-label="문제 세트">${u.data.sets.map(s => { const d = s.questions.filter(q => ansOf(u.key, q.id) != null).length; return `<a class="btn ${!filtered && s.id === set.id ? 'primary' : ''}" href="${base}?set=${s.id}${mode === 'exam' ? '&mode=exam' : ''}">${esc(s.title)} <small>${d}/${s.questions.length}</small></a>`; }).join('')}</div>
     <div class="toolbar">
       <div class="seg" role="group" aria-label="풀이 방식"><a class="btn sm ghost" style="display:none"></a>
-        <button data-mode="study" aria-pressed="${mode === 'study'}">학습 모드 <small>(바로 채점)</small></button><button data-mode="exam" aria-pressed="${mode === 'exam'}">시험 모드 <small>(마지막에 채점)</small></button></div>
+        <button data-mode="study" aria-pressed="${mode === 'study'}">학습 모드 <small>(바로 채점)</small></button><button data-mode="exam" aria-pressed="${mode === 'exam'}">시험 모드 <small>(마지막에 채점 · 답안 카드)</small></button></div>
       ${filtered ? `<span class="chip">${refF ? `§${esc(refF)} 관련` : only === 'wrong' ? '틀린 문제만' : only === 'flag' ? '★ 표시한 문제' : '안 푼 문제'} · ${list.length}문제</span><a class="btn sm" href="${base}?set=${set.id}">전체 보기</a>` : `<a class="btn sm" href="${base}?set=${set.id}&only=todo">안 푼 문제만</a>`}
       <span class="grow"></span><span class="kbd"><kbd>1</kbd>–<kbd>5</kbd> 선택 · <kbd>J</kbd>/<kbd>K</kbd> 이동 · <kbd>E</kbd> 해설 · <kbd>C</kbd> 개념</span></div>
-    ${list.length ? `<div class="quiz-layout"><div class="qlist" id="qlist">${list.map(q => qCard(u, q, mode)).join('')}</div>
-    <aside class="omr-card" id="omr" aria-label="답안 카드"></aside></div>` : `<p class="empty">${only === 'wrong' ? '틀린 문제가 없어요. 잘하고 있어요!' : only === 'flag' ? '★ 표시한 문제가 없어요.' : '풀 문제가 없어요.'}</p>`}</div>`;
+    ${list.length ? `<div class="quiz-layout${mode === 'exam' ? '' : ' solo'}"><div class="qlist" id="qlist">${list.map(q => qCard(u, q, mode)).join('')}</div>
+    ${mode === 'exam' ? '<aside class="omr-card" id="omr" aria-label="답안 카드"></aside>' : ''}</div>` : `<p class="empty">${only === 'wrong' ? '틀린 문제가 없어요. 잘하고 있어요!' : only === 'flag' ? '★ 표시한 문제가 없어요.' : '풀 문제가 없어요.'}</p>`}</div>`;
   if (!list.length) return;
   $$('.seg [data-mode]').forEach(b => b.onclick = () => { const p = new URLSearchParams(location.hash.split('?')[1] || ''); p.set('mode', b.dataset.mode); location.hash = location.hash.split('?')[0] + '?' + p; });
   renderOMR(); setCur(0, false);
   $('#qlist').addEventListener('click', onQuizClick);
-  $('#omr').addEventListener('click', onOmrClick);
+  $('#omr')?.addEventListener('click', onOmrClick);
   if (params.get('q')) { const el = document.getElementById('q-' + params.get('q')); el?.scrollIntoView({ block: 'center' }); }
 }
 function onQuizClick(e) {
@@ -295,7 +306,7 @@ function renderOMR() {
   el.innerHTML = `<h2><span>답안 카드</span><span class="omr-toggle" id="omrT">${done}/${list.length} ▴</span></h2>
     <p class="omr-sub">번호를 누르면 그 문제로 이동해요</p>
     <div class="omr-grid" style="grid-template-columns:2.2em repeat(${cols},1fr)">${list.map((q, i) => { const a = ansOf(u.key, q.id); const show = a != null && (!exam || done === list.length);
-      return `<div class="omr-row"><button class="omr-n ${i === quizState.cur ? 'cur' : ''}" data-go="${i}" aria-label="${q._n}번으로 이동">${q._n}</button>${Array.from({ length: cols }, (_, k) => { const n = k + 1; if (n > q.choices.length) return '<span></span>'; let c = 'omr-b'; if (a === n) c += show ? (n === q.answer ? ' ok' : ' no') : ' on'; if (show && a !== q.answer && n === q.answer && !exam) c += ' key'; return `<span class="${c}"></span>`; }).join('')}</div>`; }).join('')}</div>
+      return `<div class="omr-row"><button class="omr-n ${i === quizState.cur ? 'cur' : ''}" data-go="${i}" aria-label="${q._n}번으로 이동">${q._n}</button>${Array.from({ length: cols }, (_, k) => { const n = k + 1; if (n > q.choices.length) return '<span class="omr-c"></span>'; let c = 'omr-b'; if (a === n) c += show ? (n === q.answer ? ' ok' : ' no') : ' on'; if (show && a !== q.answer && n === q.answer && !exam) c += ' key'; return `<span class="omr-c"><span class="${c}"></span></span>`; }).join('')}</div>`; }).join('')}</div>
     <div class="omr-score"><span>${exam && !graded ? '채점 전' : '점수'}</span><b>${graded ? `${score}<small> / ${list.length}</small>` : `${done}<small> / ${list.length}</small>`}</b></div>
     <div class="omr-actions">
       ${exam && !graded ? `<button class="btn omr solid" data-omr="grade">남은 ${list.length - done}문제 건너뛰고 채점</button>` : ''}
