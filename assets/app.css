@@ -368,3 +368,9 @@ mark, .hl {
 @media (max-width: 520px) { .sb-stats { gap: 10px; } .sb-todo { display: none; } .sb-cur { min-width: 3em; } }
 @media (prefers-reduced-motion: reduce) { .sb-bar i { transition: none; } }
 @media print { .studybar { display: none !important; } }
+
+/* 오답 많은 개념 표시 */
+.weak { display: inline-block; font-size: .72rem; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--bad); color: var(--bad); background: transparent; white-space: nowrap; letter-spacing: 0; vertical-align: middle; }
+.weak.hot { background: var(--bad); color: #fff; }
+.weak.sm { margin-left: 6px; font-size: .68rem; padding: 2px 6px; }
+.doc h2 .weak, .doc h3 .weak, .doc h4 .weak { align-self: center; }

@@ -86,10 +86,12 @@ function renderBlock(b) {
   }
 }
 function qsForSection(u, sid) { return [...u.qs.values()].filter(q => String(q.ref) === String(sid) || String(q.ref).startsWith(sid + '.')); }
+function badOf(u, sid) { let n = 0; for (const q of qsForSection(u, sid)) { const a = ansOf(u.key, q.id); if (a != null && a !== q.answer) n++; } return n; }
+const weakBadge = (n, cls = '') => n ? `<span class="weak ${n >= 2 ? 'hot' : ''} ${cls}" title="이 개념 관련 오답 ${n}개">${n >= 2 ? '약점 ' : ''}오답 ${n}</span>` : '';
 function renderSection(u, s, depth = 0, withBtn = true) {
   const tag = depth === 0 ? 'h2' : depth === 1 ? 'h3' : 'h4';
   const nq = withBtn ? qsForSection(u, s.id).filter(q => String(q.ref) === String(s.id)).length : 0;
-  const head = `<${tag}><span class="sec-id">§${esc(s.id)}</span> <span>${esc(s.title)}</span>${nq ? `<a class="btn sm ghost sec-qs" href="#/${u.cid}/${u.uid}/quiz?ref=${encodeURIComponent(s.id)}">관련 문제 ${nq}개</a>` : ''}</${tag}>`;
+  const head = `<${tag}><span class="sec-id">§${esc(s.id)}</span> <span>${esc(s.title)}</span>${weakBadge(badOf(u, s.id))}${nq ? `<a class="btn sm ghost sec-qs" href="#/${u.cid}/${u.uid}/quiz?ref=${encodeURIComponent(s.id)}">관련 문제 ${nq}개</a>` : ''}</${tag}>`;
   return `<section id="s-${esc(s.id)}" data-sid="${esc(s.id)}">${head}${(s.blocks || []).map(renderBlock).join('')}${(s.sections || []).map(c => renderSection(u, c, depth + 1, withBtn)).join('')}</section>`;
 }
 function conceptHTML(u, sid) {
@@ -157,7 +159,7 @@ async function viewRead(u, params) {
   setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title }]);
   remember(u, 'read', `#/${u.cid}/${u.uid}/read`);
   document.title = u.data.title + ' · 개념';
-  const toc = (list) => '<ol>' + list.map(s => `<li><a href="#/${u.cid}/${u.uid}/read?s=${encodeURIComponent(s.id)}" data-toc="${esc(s.id)}"><span class="sid">§${esc(s.id)}</span>${esc(s.title)}</a>${s.sections?.length ? toc(s.sections) : ''}</li>`).join('') + '</ol>';
+  const toc = (list) => '<ol>' + list.map(s => `<li><a href="#/${u.cid}/${u.uid}/read?s=${encodeURIComponent(s.id)}" data-toc="${esc(s.id)}"><span class="sid">§${esc(s.id)}</span>${esc(s.title)}${weakBadge(badOf(u, s.id), 'sm')}</a>${s.sections?.length ? toc(s.sections) : ''}</li>`).join('') + '</ol>';
   main.innerHTML = `<div class="wrap">${unitHead(u, 'read')}
     <div class="toolbar">
       <button class="btn toc-toggle" id="tocBtn" aria-expanded="false" aria-controls="toc">☰ 목차</button>
