@@ -264,12 +264,13 @@ async function viewQuiz(u, params) {
       ${filtered ? `<span class="chip">${refF ? `§${esc(refF)} 관련` : only === 'wrong' ? '틀린 문제만' : only === 'flag' ? '★ 표시한 문제' : '안 푼 문제'} · ${list.length}문제</span><a class="btn sm" href="${base}?set=${set.id}">전체 보기</a>` : `<a class="btn sm" href="${base}?set=${set.id}&only=todo">안 푼 문제만</a>`}
       <span class="grow"></span><span class="kbd"><kbd>1</kbd>–<kbd>5</kbd> 선택 · <kbd>J</kbd>/<kbd>K</kbd> 이동 · <kbd>E</kbd> 해설 · <kbd>C</kbd> 개념</span></div>
     ${list.length ? `<div class="quiz-layout${mode === 'exam' ? '' : ' solo'}"><div class="qlist" id="qlist">${list.map(q => qCard(u, q, mode)).join('')}</div>
-    ${mode === 'exam' ? '<aside class="omr-card" id="omr" aria-label="답안 카드"></aside>' : ''}</div>` : `<p class="empty">${only === 'wrong' ? '틀린 문제가 없어요. 잘하고 있어요!' : only === 'flag' ? '★ 표시한 문제가 없어요.' : '풀 문제가 없어요.'}</p>`}</div>`;
+    ${mode === 'exam' ? '<aside class="omr-card" id="omr" aria-label="답안 카드"></aside>' : '<nav class="studybar" id="sbar" aria-label="풀이 현황"></nav>'}</div>` : `<p class="empty">${only === 'wrong' ? '틀린 문제가 없어요. 잘하고 있어요!' : only === 'flag' ? '★ 표시한 문제가 없어요.' : '풀 문제가 없어요.'}</p>`}</div>`;
   if (!list.length) return;
   $$('.seg [data-mode]').forEach(b => b.onclick = () => { const p = new URLSearchParams(location.hash.split('?')[1] || ''); p.set('mode', b.dataset.mode); location.hash = location.hash.split('?')[0] + '?' + p; });
   renderOMR(); setCur(0, false);
   $('#qlist').addEventListener('click', onQuizClick);
   $('#omr')?.addEventListener('click', onOmrClick);
+  $('#sbar')?.addEventListener('click', onBarClick);
   if (params.get('q')) { const el = document.getElementById('q-' + params.get('q')); el?.scrollIntoView({ block: 'center' }); }
 }
 function onQuizClick(e) {
@@ -295,7 +296,24 @@ function rerenderCard(card, q) {
   if (wasOpen) { const ex = $('.explain', nc); ex.innerHTML = explainHTML(u, q); ex.hidden = false; }
 }
 function refreshHeaderCount() { const { u } = quizState; const st = unitStats(u); const c = $('.tabs a[aria-current] .count'); if (c) c.textContent = `${st.done}/${st.total}`; }
+function renderBar() {
+  const el = $('#sbar'); if (!el) return; const { u, list, cur } = quizState;
+  const n = list.length; let ok = 0, bad = 0;
+  for (const q of list) { const a = ansOf(u.key, q.id); if (a == null) continue; a === q.answer ? ok++ : bad++; }
+  const done = ok + bad; const pct = done ? Math.round(ok / done * 100) : 0;
+  el.innerHTML = `<div class="sb-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${done}"><i class="ok" style="width:${ok / n * 100}%"></i><i class="no" style="width:${bad / n * 100}%"></i></div>
+    <div class="sb-row">
+      <div class="sb-stats"><span><small>푼 문제</small><b>${done}<em>/${n}</em></b></span><span class="ok"><small>정답</small><b>${ok}</b></span><span class="no"><small>오답</small><b>${bad}</b></span><span><small>정답률</small><b>${done ? pct + '%' : '–'}</b></span></div>
+      <div class="sb-nav"><button class="btn sm" data-sb="prev" aria-label="이전 문제">‹</button><span class="sb-cur">${cur + 1}<em>/${n}</em></span><button class="btn sm" data-sb="next" aria-label="다음 문제">›</button><button class="btn sm sb-todo" data-sb="todo">안 푼 문제로</button></div>
+    </div>`;
+}
+function onBarClick(e) {
+  const a = e.target.closest('[data-sb]')?.dataset.sb; if (!a) return; const { u, list, cur } = quizState;
+  if (a === 'prev') setCur(cur - 1, true); else if (a === 'next') setCur(cur + 1, true);
+  else { const i = list.findIndex((q, k) => ansOf(u.key, q.id) == null && k !== cur); const j = i < 0 ? list.findIndex(q => ansOf(u.key, q.id) == null) : i; if (j < 0) toast('모두 풀었어요'); else setCur(j, true); }
+}
 function renderOMR() {
+  renderBar();
   const { u, list, mode } = quizState; const el = $('#omr'); if (!el) return;
   const done = list.filter(q => ansOf(u.key, q.id) != null).length;
   const exam = mode === 'exam';
@@ -330,6 +348,7 @@ function setCur(i, scroll) {
   const el = document.getElementById('q-' + list[i].id); el.classList.add('active');
   if (scroll) el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   $$('.omr-n').forEach((b, k) => b.classList.toggle('cur', k === i));
+  renderBar();
 }
 document.addEventListener('keydown', e => {
   if (!quizState || !$('#qlist') || !$('#sheet').hidden || e.target.matches('input,textarea,select') || e.metaKey || e.ctrlKey || e.altKey) return;

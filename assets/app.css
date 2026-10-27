@@ -349,3 +349,22 @@ mark, .hl {
   .reader, .quiz-layout { display: block; }
   .q, .unit { box-shadow: none; break-inside: avoid; }
 }
+
+/* 학습 모드 하단 현황 바 */
+.studybar { position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; background: var(--paper-hi); border-top: 1.5px solid var(--omr); box-shadow: 0 -10px 30px -18px rgba(0,0,0,.35); padding: 0 max(16px, env(safe-area-inset-left)) env(safe-area-inset-bottom); }
+.sb-bar { display: flex; height: 4px; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left))); background: var(--paper-lo); }
+.sb-bar i { display: block; height: 100%; transition: width .25s ease; }
+.sb-bar .ok { background: var(--ok); } .sb-bar .no { background: var(--bad); }
+.sb-row { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0 10px; }
+.sb-stats { display: flex; gap: 14px; min-width: 0; }
+.sb-stats span { display: grid; line-height: 1.15; }
+.sb-stats small { font-size: .7em; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+.sb-stats b { font-size: 1.15em; font-feature-settings: "tnum" 1; }
+.sb-stats em, .sb-cur em { font-style: normal; font-weight: 500; color: var(--ink-3); font-size: .8em; margin-left: 1px; }
+.sb-stats .ok b { color: var(--ok); } .sb-stats .no b { color: var(--bad); }
+.sb-nav { display: flex; align-items: center; gap: 6px; flex: none; }
+.sb-nav .btn { min-width: 40px; }
+.sb-cur { min-width: 3.4em; text-align: center; font-weight: 700; font-feature-settings: "tnum" 1; }
+@media (max-width: 520px) { .sb-stats { gap: 10px; } .sb-todo { display: none; } .sb-cur { min-width: 3em; } }
+@media (prefers-reduced-motion: reduce) { .sb-bar i { transition: none; } }
+@media print { .studybar { display: none !important; } }
