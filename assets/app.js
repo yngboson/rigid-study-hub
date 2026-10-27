@@ -120,11 +120,11 @@ async function viewHome() {
   updateBadge(all);
   const totalQ = all.reduce((a, u) => a + u.qs.size, 0);
   const doneQ = all.reduce((a, u) => a + unitStats(u).done, 0);
-  const last = store.last && all.find(u => u.key === store.last.unit);
+  const last = store.last && store.last.href && all.some(u => u.key === store.last.unit) ? store.last : null;
   main.innerHTML = `<div class="wrap">
     <div class="hero"><div><h1>${esc(m.site?.title || 'Study Hub')}</h1><p>형광펜 친 강의록을 개념 요약과 문제로 바꿔 둔 공부방. 읽다가 막히면 문제로, 틀리면 개념으로 바로 이동합니다.</p></div>
     <div class="hero-stats"><div><b>${all.length}</b><span>단원</span></div><div><b>${totalQ}</b><span>문제</span></div><div><b>${doneQ}</b><span>푼 문제</span></div></div></div>
-    ${last ? `<a class="resume" href="${esc(last.href)}"><div><b>이어서 공부하기</b><small>${esc(last.unit.split('/')[0] === last.unit ? '' : last.title)}</small></div><span class="go">계속 ›</span></a>` : ''}
+    ${last ? `<a class="resume" href="${esc(last.href)}"><div><b>이어서 공부하기</b><small>${esc(last.title || '')}</small></div><span class="go">계속 ›</span></a>` : ''}
     ${m.courses.map(c => `<section class="course"><h2>${esc(c.title)}</h2><div class="units">${c.units.map(meta => {
       const u = unitCache.get(`${c.id}/${meta.id}`); const st = unitStats(u); const pct = x => (x / st.total * 100).toFixed(1);
       return `<article class="unit"><div><h3>${esc(meta.title)}</h3>${meta.subtitle ? `<p class="sub">${esc(meta.subtitle)}</p>` : ''}</div>
