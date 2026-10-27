@@ -5,7 +5,7 @@ const main = $('#main');
 
 /* ───────── 저장소 (진도는 이 브라우저에만 저장) ───────── */
 const KEY = 'rsh:v1';
-const defaults = { answers: {}, flags: {}, last: null, settings: { theme: 'auto', fs: 1, instant: true, shuffle: false } };
+const defaults = { answers: {}, flags: {}, retry: {}, last: null, settings: { theme: 'auto', fs: 1, instant: true, shuffle: false } };
 let store;
 try { store = { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; store.settings = { ...defaults.settings, ...store.settings }; }
 catch { store = structuredClone(defaults); }
@@ -242,7 +242,9 @@ function explainHTML(u, q) {
   <div class="ref">근거: <a href="#/${u.cid}/${u.uid}/read?s=${encodeURIComponent(q.ref)}">§${esc(q.ref)} ${esc(s?.title || '')}</a></div>`;
 }
 let quizState = null;
-async function viewQuiz(u, params) {
+async function viewQuiz(u0, params) {
+  let u = u0;
+  if (params.get('only') === 'retry') u = { ...u0, key: u0.key + '#retry', base: u0.key, retry: true };
   setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '문제풀이' }]);
   document.title = u.data.title + ' · 문제풀이';
   const setId = params.get('set') || u.data.sets[0].id; const refF = params.get('ref'); const only = params.get('only'); const mode = params.get('mode') === 'exam' ? 'exam' : 'study';
@@ -252,18 +254,19 @@ async function viewQuiz(u, params) {
   if (only === 'wrong') list = [...u.qs.values()].filter(q => { const a = ansOf(u.key, q.id); return a != null && a !== q.answer; });
   if (only === 'flag') list = [...u.qs.values()].filter(q => store.flags[`${u.key}|${q.id}`]);
   if (only === 'todo') list = set.questions.filter(q => ansOf(u.key, q.id) == null);
+  if (only === 'retry') list = (store.retry[u0.key] || []).map(id => u0.qs.get(id)).filter(Boolean);
   const filtered = !!(refF || only);
-  remember(u, 'quiz', `#/${u.cid}/${u.uid}/quiz?set=${set.id}`);
+  remember(u0, 'quiz', only === 'retry' ? `#/${u.cid}/${u.uid}/quiz?only=retry` : `#/${u.cid}/${u.uid}/quiz?set=${set.id}`);
   quizState = { u, list, mode, set, filtered, cur: 0 };
   const base = `#/${u.cid}/${u.uid}/quiz`;
   const sc = list.reduce((a, q) => { const x = ansOf(u.key, q.id); return a + (x === q.answer ? 1 : 0); }, 0);
   const done = list.filter(q => ansOf(u.key, q.id) != null).length;
-  main.innerHTML = `<div class="wrap">${unitHead(u, 'quiz')}
+  main.innerHTML = `<div class="wrap">${unitHead(u0, 'quiz')}
     <div class="set-pick" role="tablist" aria-label="문제 세트">${u.data.sets.map(s => { const d = s.questions.filter(q => ansOf(u.key, q.id) != null).length; return `<a class="btn ${!filtered && s.id === set.id ? 'primary' : ''}" href="${base}?set=${s.id}${mode === 'exam' ? '&mode=exam' : ''}">${esc(s.title)} <small>${d}/${s.questions.length}</small></a>`; }).join('')}</div>
     <div class="toolbar">
       <div class="seg" role="group" aria-label="풀이 방식"><a class="btn sm ghost" style="display:none"></a>
         <button data-mode="study" aria-pressed="${mode === 'study'}">학습 모드 <small>(바로 채점)</small></button><button data-mode="exam" aria-pressed="${mode === 'exam'}">시험 모드 <small>(마지막에 채점 · 답안 카드)</small></button></div>
-      ${filtered ? `<span class="chip">${refF ? `§${esc(refF)} 관련` : only === 'wrong' ? '틀린 문제만' : only === 'flag' ? '★ 표시한 문제' : '안 푼 문제'} · ${list.length}문제</span><a class="btn sm" href="${base}?set=${set.id}">전체 보기</a>` : `<a class="btn sm" href="${base}?set=${set.id}&only=todo">안 푼 문제만</a>`}
+      ${filtered ? `<span class="chip">${refF ? `§${esc(refF)} 관련` : only === 'retry' ? '오답 새로 풀기' : only === 'wrong' ? '틀린 문제만' : only === 'flag' ? '★ 표시한 문제' : '안 푼 문제'} · ${list.length}문제</span><a class="btn sm" href="${base}?set=${set.id}">전체 보기</a>` : `<a class="btn sm" href="${base}?set=${set.id}&only=todo">안 푼 문제만</a>`}
       <span class="grow"></span><span class="kbd"><kbd>1</kbd>–<kbd>5</kbd> 선택 · <kbd>J</kbd>/<kbd>K</kbd> 이동 · <kbd>E</kbd> 해설 · <kbd>C</kbd> 개념</span></div>
     ${list.length ? `<div class="quiz-layout${mode === 'exam' ? '' : ' solo'}"><div class="qlist" id="qlist">${list.map(q => qCard(u, q, mode)).join('')}</div>
     ${mode === 'exam' ? '<aside class="omr-card" id="omr" aria-label="답안 카드"></aside>' : '<nav class="studybar" id="sbar" aria-label="풀이 현황"></nav>'}</div>` : `<p class="empty">${only === 'wrong' ? '틀린 문제가 없어요. 잘하고 있어요!' : only === 'flag' ? '★ 표시한 문제가 없어요.' : '풀 문제가 없어요.'}</p>`}</div>`;
@@ -286,6 +289,7 @@ function onQuizClick(e) {
 }
 function pick(card, q, n) {
   const { u, mode } = quizState; setAns(u.key, q.id, n);
+  if (u.retry && n === q.answer) setAns(u.base, q.id, null);   // 새로 풀어서 맞히면 오답노트에서 졸업
   rerenderCard(card, q);
   if (store.settings.instant && mode !== 'exam' && n !== q.answer) { const ex = $('.explain', document.getElementById('q-' + q.id)); ex.innerHTML = explainHTML(u, q); ex.hidden = false; }
   renderOMR(); refreshHeaderCount();
@@ -297,7 +301,7 @@ function rerenderCard(card, q) {
   if (card.classList.contains('active')) nc.classList.add('active'); card.replaceWith(nc);
   if (wasOpen) { const ex = $('.explain', nc); ex.innerHTML = explainHTML(u, q); ex.hidden = false; }
 }
-function refreshHeaderCount() { const { u } = quizState; const st = unitStats(u); const c = $('.tabs a[aria-current] .count'); if (c) c.textContent = `${st.done}/${st.total}`; }
+function refreshHeaderCount() { const { u } = quizState; const st = unitStats(u.base ? { ...u, key: u.base } : u); const c = $('.tabs a[aria-current] .count'); if (c) c.textContent = `${st.done}/${st.total}`; }
 function renderBar() {
   const el = $('#sbar'); if (!el) return; const { u, list, cur } = quizState;
   const n = list.length; let ok = 0, bad = 0;
@@ -401,10 +405,15 @@ async function viewReview(u) {
   setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '오답노트' }]);
   document.title = u.data.title + ' · 오답노트'; remember(u, 'review', `#/${u.cid}/${u.uid}/review`);
   const wrong = [...u.qs.values()].filter(q => { const a = ansOf(u.key, q.id); return a != null && a !== q.answer; });
+  const rl = (store.retry[u.key] || []).filter(id => u.qs.has(id)); const resumeDone = rl.filter(id => ansOf(u.key + '#retry', id) != null).length; const resume = rl.length > 0 && resumeDone < rl.length;
   main.innerHTML = `<div class="wrap">${unitHead(u, 'review')}
-    <div class="toolbar">${wrong.length ? `<a class="btn primary" href="#/${u.cid}/${u.uid}/quiz?only=wrong">틀린 ${wrong.length}문제만 다시 풀기</a>` : ''}</div>
+    <div class="toolbar">${wrong.length ? `<button class="btn primary" id="retryNew">새로 풀기 · ${wrong.length}문제 <small>(풀이 칸 비움)</small></button>` : ''}${resume ? `<a class="btn" href="#/${u.cid}/${u.uid}/quiz?only=retry">이어서 풀기 <small>${resumeDone}/${rl.length}</small></a>` : ''}${wrong.length ? `<a class="btn ghost" href="#/${u.cid}/${u.uid}/quiz?only=wrong">풀이 기록 보며 다시 풀기</a>` : ''}</div>
     <div class="qlist" id="rv">${wrong.length ? wrong.map(q => reviewCard(u, q)).join('') : '<p class="empty">틀린 문제가 없어요. 문제풀이에서 풀어 보면 여기에 쌓입니다.</p>'}</div></div>`;
   bindReview(u);
+  $('#retryNew')?.addEventListener('click', () => {
+    const ids = wrong.map(q => q.id); store.retry[u.key] = ids; ids.forEach(id => delete store.answers[`${u.key}#retry|${id}`]); save();
+    location.hash = `#/${u.cid}/${u.uid}/quiz?only=retry`;
+  });
 }
 function bindReview(u) {
   $('#rv')?.addEventListener('click', e => {
