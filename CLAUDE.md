@@ -16,3 +16,4 @@
 - 변경 후 로컬 확인: `python3 -m http.server` 후 `http://localhost:8000`.
 - 진도·오답은 사용자 브라우저 localStorage(`rsh:v1`)에만 저장된다. 서버 저장 기능을 임의로 추가하지 않는다.
 - GitHub GraphQL은 세션에서 막혀 있다. `gh api repos/...` REST만 쓴다.
+- `assets/` 를 고치면 `index.html`의 `app.css?v=N`, `app.js?v=N`의 N을 올린다 (Pages 캐시 때문에 옛 파일이 남는 걸 방지).
