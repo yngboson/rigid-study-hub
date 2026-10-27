@@ -1,0 +1,12 @@
+# 강의 원본은 절대 커밋하지 않는다 (가공물만)
+*.pdf
+*.PDF
+*.ppt
+*.pptx
+*.hwp
+*.hwpx
+*.doc
+*.docx
+__pycache__/
+*.pyc
+.DS_Store

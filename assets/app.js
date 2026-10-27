@@ -7,7 +7,15 @@ const main = $('#main');
 const KEY = 'rsh:v1';
 const defaults = { answers: {}, flags: {}, retry: {}, last: null, settings: { theme: 'auto', fs: 1, instant: true, shuffle: false } };
 let store;
-try { store = { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; store.settings = { ...defaults.settings, ...store.settings }; }
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+function normalize(raw) {
+  const s = structuredClone(defaults); if (!isObj(raw)) return s;
+  for (const k of ['answers', 'flags', 'retry']) if (isObj(raw[k])) s[k] = raw[k];
+  if (isObj(raw.last)) s.last = raw.last;
+  if (isObj(raw.settings)) s.settings = { ...defaults.settings, ...raw.settings };
+  return s;
+}
+try { store = normalize(JSON.parse(localStorage.getItem(KEY) || '{}')); }
 catch { store = structuredClone(defaults); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
 const ansOf = (u, qid) => store.answers[`${u}|${qid}`];
@@ -62,13 +70,15 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 
 /* ───────── 시트(개념 서랍) ───────── */
 let lastFocus = null;
+const bgLock = on => { document.documentElement.style.overflow = on ? 'hidden' : ''; for (const el of [$('.topbar'), main]) if (el) el.inert = on; };
 function openSheet(title, html) {
-  lastFocus = document.activeElement;
+  if ($('#sheet').hidden) lastFocus = document.activeElement;
   $('#sheetTitle').textContent = title; $('#sheetBody').innerHTML = html;
   $('#sheet').hidden = false; $('#sheet .sheet-panel').scrollTop = 0; $('#sheetBody').scrollTop = 0;
+  bgLock(true);
   $('#sheet [data-close].icon-btn').focus();
 }
-function closeSheet() { $('#sheet').hidden = true; lastFocus?.focus?.(); }
+function closeSheet(restore = true) { $('#sheet').hidden = true; bgLock(false); if (restore) lastFocus?.focus?.(); }
 $('#sheet').addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheet(); });
 
 /* ───────── 렌더링 조각 ───────── */
@@ -115,10 +125,17 @@ function updateBadge(units) {
 }
 
 /* ───────── 화면: 홈 ───────── */
-async function viewHome() {
-  setCrumbs([]);
+async function loadAllUnits() {
   const m = await getManifest();
-  const all = []; for (const c of m.courses) for (const meta of c.units) all.push(await getUnit(c.id, meta.id));
+  const rs = await Promise.allSettled(m.courses.flatMap(c => c.units.map(x => getUnit(c.id, x.id))));
+  return rs.filter(r => r.status === 'fulfilled').map(r => r.value);
+}
+const refreshBadge = () => loadAllUnits().then(updateBadge).catch(() => {});
+let routeSeq = 0;
+async function viewHome() {
+  setCrumbs([]); const seq = routeSeq;
+  const m = await getManifest();
+  const all = await loadAllUnits(); if (seq !== routeSeq) return;
   updateBadge(all);
   const totalQ = all.reduce((a, u) => a + u.qs.size, 0);
   const doneQ = all.reduce((a, u) => a + unitStats(u).done, 0);
@@ -128,7 +145,7 @@ async function viewHome() {
     <div class="hero-stats"><div><b>${all.length}</b><span>단원</span></div><div><b>${totalQ}</b><span>문제</span></div><div><b>${doneQ}</b><span>푼 문제</span></div></div></div>
     ${last ? `<a class="resume" href="${esc(last.href)}"><div><b>이어서 공부하기</b><small>${esc(last.title || '')}</small></div><span class="go">계속 ›</span></a>` : ''}
     ${m.courses.map(c => `<section class="course"><h2>${esc(c.title)}</h2><div class="units">${c.units.map(meta => {
-      const u = unitCache.get(`${c.id}/${meta.id}`); const st = unitStats(u); const pct = x => (x / st.total * 100).toFixed(1);
+      const u = unitCache.get(`${c.id}/${meta.id}`); if (!u) return ''; const st = unitStats(u); const pct = x => (x / st.total * 100).toFixed(1);
       return `<article class="unit"><div><h3>${esc(meta.title)}</h3>${meta.subtitle ? `<p class="sub">${esc(meta.subtitle)}</p>` : ''}</div>
       <div class="meta"><span class="chip">문제 ${st.total}</span><span class="chip">요약 ${u.flat.length}절</span>${(meta.tags || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')}<span class="chip">${esc(meta.updated || '')}</span></div>
       <div><div class="meter" role="img" aria-label="정답 ${st.ok}, 오답 ${st.bad}, 전체 ${st.total}"><i class="m-ok" style="width:${pct(st.ok)}%"></i><i class="m-bad" style="width:${pct(st.bad)}%"></i></div>
@@ -199,7 +216,13 @@ async function viewRead(u, params) {
     const term = input.value.trim(); const info = $('#hitInfo'); if (!term) { info.textContent = ''; return; }
     let hits = 0; const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT); const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
     const lt = term.toLowerCase();
-    for (const n of nodes) { if (n.parentElement.closest('.sec-qs')) continue; const idx = n.data.toLowerCase().indexOf(lt); if (idx < 0) continue; const r = document.createRange(); r.setStart(n, idx); r.setEnd(n, idx + term.length); const span = document.createElement('span'); span.className = 'found'; r.surroundContents(span); hits++; if (hits === 1) span.scrollIntoView({ block: 'center' }); }
+    for (const n of nodes) {
+      if (n.parentElement.closest('.sec-qs')) continue;
+      const low = n.data.toLowerCase(), idxs = []; let i = -1;
+      while ((i = low.indexOf(lt, i + 1)) >= 0) { idxs.push(i); i += lt.length - 1; }
+      for (const idx of idxs.reverse()) { const r = document.createRange(); r.setStart(n, idx); r.setEnd(n, idx + term.length); const span = document.createElement('span'); span.className = 'found'; r.surroundContents(span); hits++; }
+    }
+    $('.found', doc)?.scrollIntoView({ block: 'center' });
     info.textContent = hits ? `${hits}곳` : '결과 없음';
   });
   if (params.get('s')) setTimeout(() => jumpTo(params.get('s')), 60);
@@ -215,7 +238,7 @@ function choiceMap(q) { return q.choices.map((c, i) => ({ c, i: i + 1 })); }
 function qCard(u, q, mode) {
   const a = ansOf(u.key, q.id); const answered = a != null; const show = answered && store.settings.instant && mode !== 'exam';
   const ok = a === q.answer;
-  const flagged = !!store.flags[`${u.key}|${q.id}`];
+  const flagged = !!store.flags[`${u.base || u.key}|${q.id}`];
   return `<article class="q" id="q-${esc(q.id)}" data-qid="${esc(q.id)}" tabindex="-1">
     <div class="q-top"><span class="q-no">${q._n}.</span>
       <span class="q-state ${show ? (ok ? 'ok' : 'bad') : 'pending'}">${show ? (ok ? '정답' : '오답') : answered ? '선택함' : '미응답'}</span>
@@ -272,7 +295,8 @@ async function viewQuiz(u0, params) {
     ${mode === 'exam' ? '<aside class="omr-card" id="omr" aria-label="답안 카드"></aside>' : '<nav class="studybar" id="sbar" aria-label="풀이 현황"></nav>'}</div>` : `<p class="empty">${only === 'wrong' ? '틀린 문제가 없어요. 잘하고 있어요!' : only === 'flag' ? '★ 표시한 문제가 없어요.' : '풀 문제가 없어요.'}</p>`}</div>`;
   if (!list.length) return;
   $$('.seg [data-mode]').forEach(b => b.onclick = () => { const p = new URLSearchParams(location.hash.split('?')[1] || ''); p.set('mode', b.dataset.mode); location.hash = location.hash.split('?')[0] + '?' + p; });
-  renderOMR(); setCur(0, false);
+  const qi = params.get('q') ? list.findIndex(q => q.id === params.get('q')) : -1;
+  renderOMR(); setCur(Math.max(0, qi), false);
   $('#qlist').addEventListener('click', onQuizClick);
   $('#omr')?.addEventListener('click', onOmrClick);
   $('#sbar')?.addEventListener('click', onBarClick);
@@ -281,11 +305,12 @@ async function viewQuiz(u0, params) {
 function onQuizClick(e) {
   const btn = e.target.closest('[data-act]'); if (!btn) return; const card = btn.closest('.q'); const { u, mode } = quizState; const q = u.qs.get(card.dataset.qid);
   const act = btn.dataset.act;
+  const ci = quizState.list.indexOf(q); if (ci >= 0 && ci !== quizState.cur) setCur(ci, false);
   if (act === 'pick') pick(card, q, +btn.dataset.n);
   else if (act === 'concept') openSheet(`§${q.ref} ${u.sections.get(String(q.ref))?.title || ''}`, conceptHTML(u, q.ref));
   else if (act === 'explain') { const ex = $('.explain', card); ex.innerHTML = explainHTML(u, q); ex.hidden = !ex.hidden; }
   else if (act === 'reset') { setAns(u.key, q.id, null); rerenderCard(card, q); renderOMR(); }
-  else if (act === 'flag') { const k = `${u.key}|${q.id}`; if (store.flags[k]) delete store.flags[k]; else store.flags[k] = 1; save(); btn.setAttribute('aria-pressed', !!store.flags[k]); btn.textContent = store.flags[k] ? '★' : '☆'; }
+  else if (act === 'flag') { const k = `${u.base || u.key}|${q.id}`; if (store.flags[k]) delete store.flags[k]; else store.flags[k] = 1; save(); btn.setAttribute('aria-pressed', !!store.flags[k]); btn.textContent = store.flags[k] ? '★' : '☆'; }
 }
 function pick(card, q, n) {
   const { u, mode } = quizState; setAns(u.key, q.id, n);
@@ -293,7 +318,7 @@ function pick(card, q, n) {
   rerenderCard(card, q);
   if (store.settings.instant && mode !== 'exam' && n !== q.answer) { const ex = $('.explain', document.getElementById('q-' + q.id)); ex.innerHTML = explainHTML(u, q); ex.hidden = false; }
   renderOMR(); refreshHeaderCount();
-  updateBadge([...unitCache.values()]);
+  refreshBadge();
 }
 function rerenderCard(card, q) {
   const { u, mode } = quizState; const wasOpen = !$('.explain', card).hidden;
@@ -333,7 +358,7 @@ function renderOMR() {
       return `<div class="omr-row"><button class="omr-n ${i === quizState.cur ? 'cur' : ''}" data-go="${i}" aria-label="${q._n}번으로 이동">${q._n}</button>${Array.from({ length: cols }, (_, k) => { const n = k + 1; if (n > q.choices.length) return '<span class="omr-c"></span>'; let c = 'omr-b'; if (a === n) c += show ? (n === q.answer ? ' ok' : ' no') : ' on'; if (show && a !== q.answer && n === q.answer && !exam) c += ' key'; return `<span class="omr-c"><span class="${c}"></span></span>`; }).join('')}</div>`; }).join('')}</div>
     <div class="omr-score"><span>${exam && !graded ? '채점 전' : '점수'}</span><b>${graded ? `${score}<small> / ${list.length}</small>` : `${done}<small> / ${list.length}</small>`}</b></div>
     <div class="omr-actions">
-      ${exam && !graded ? `<button class="btn omr solid" data-omr="grade">남은 ${list.length - done}문제 건너뛰고 채점</button>` : ''}
+      ${exam ? `<button class="btn omr solid" data-omr="grade">${graded ? '채점하고 해설 보기' : `남은 ${list.length - done}문제 건너뛰고 채점`}</button>` : ''}
       ${wrong ? `<a class="btn omr more" href="#/${u.cid}/${u.uid}/review">오답노트 (${wrong})</a>` : ''}
       <button class="btn more" data-omr="next-todo">안 푼 문제로</button>
       <button class="btn more" data-omr="reset">이 세트 초기화</button></div>`;
@@ -346,7 +371,7 @@ function onOmrClick(e) {
   const a = e.target.closest('[data-omr]')?.dataset.omr;
   if (a === 'next-todo') { const i = list.findIndex(q => ansOf(u.key, q.id) == null); if (i < 0) toast('모두 풀었어요'); else setCur(i, true); }
   if (a === 'reset') { if (!confirm('이 세트의 풀이 기록을 지울까요?')) return; list.forEach(q => setAns(u.key, q.id, null)); location.reload(); }
-  if (a === 'grade') { quizState.mode = 'study'; list.forEach(q => { const c = document.getElementById('q-' + q.id); rerenderCard(c, q); }); renderOMR(); }
+  if (a === 'grade') { quizState.mode = 'study'; $$('.seg [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === 'study')); list.forEach(q => { const c = document.getElementById('q-' + q.id); rerenderCard(c, q); }); renderOMR(); }
 }
 function setCur(i, scroll) {
   const { list } = quizState; i = Math.max(0, Math.min(list.length - 1, i)); quizState.cur = i;
@@ -383,7 +408,7 @@ async function viewKey(u, params) {
       <div class="key-list">${set.questions.map(q => `<article class="key-item" id="k-${esc(q.id)}"><h3><span>${q._n}.</span><span class="key-ans">${CIRC[q.answer - 1]} ${md(q.choices[q.answer - 1])}</span></h3>
         <p>${md(q.stem)}</p><p>${md(q.explanation)}</p>
         <div class="links"><a class="btn sm" href="${base}/quiz?set=${set.id}&q=${encodeURIComponent(q.id)}">문제로</a><button class="btn sm" data-concept="${esc(q.id)}">개념 §${esc(q.ref)}</button></div></article>`).join('')}</div>`).join('')}</div></div>`;
-  $('#cover').onclick = () => { const p = new URLSearchParams(location.hash.split('?')[1] || ''); p.set('show', covered ? '1' : '0'); history.replaceState(null, '', location.hash.split('?')[0] + '?' + p); viewKey(u, p); };
+  $('#cover').onclick = () => { const p = new URLSearchParams(location.hash.split('?')[1] || ''); p.set('show', covered ? '1' : '0'); p.delete('q'); history.replaceState(null, '', location.hash.split('?')[0] + '?' + p); viewKey(u, p); };
   const kw = $('#keywrap');
   kw.addEventListener('click', e => {
     const peek = e.target.closest('b, .key-ans'); if (kw.classList.contains('covered') && peek) { peek.classList.toggle('peek'); e.preventDefault(); return; }
@@ -419,17 +444,21 @@ function bindReview(u) {
   $('#rv')?.addEventListener('click', e => {
     const b = e.target.closest('[data-r]'); if (!b) return; const card = b.closest('.q'); const uu = unitCache.get(card.dataset.ukey) || u; const q = uu.qs.get(card.dataset.qid);
     if (b.dataset.r === 'concept') openSheet(`§${q.ref} ${uu.sections.get(String(q.ref))?.title || ''}`, conceptHTML(uu, q.ref));
-    if (b.dataset.r === 'clear') { setAns(uu.key, q.id, null); card.remove(); updateBadge([...unitCache.values()]); toast('오답노트에서 지웠어요'); }
+    if (b.dataset.r === 'clear') {
+      setAns(uu.key, q.id, null);
+      if (store.retry[uu.key]) store.retry[uu.key] = store.retry[uu.key].filter(id => id !== q.id);
+      save(); const y = scrollY; route().then(() => scrollTo(0, y)); toast('오답노트에서 지웠어요');
+    }
   });
 }
 async function viewAllReview() {
   setCrumbs([{ t: '홈', href: '#/' }, { t: '전체 오답노트' }]); document.title = '전체 오답노트';
-  const m = await getManifest(); const all = []; for (const c of m.courses) for (const meta of c.units) all.push(await getUnit(c.id, meta.id));
+  const seq = routeSeq; const all = await loadAllUnits(); if (seq !== routeSeq) return;
   updateBadge(all);
   const groups = all.map(u => ({ u, w: [...u.qs.values()].filter(q => { const a = ansOf(u.key, q.id); return a != null && a !== q.answer; }) })).filter(g => g.w.length);
   main.innerHTML = `<div class="wrap"><div class="hero"><div><h1>전체 오답노트</h1><p>모든 단원에서 틀린 문제를 모았어요.</p></div></div>
     <div id="rv" class="review-group">${groups.length ? groups.map(g => `<h2>${esc(g.u.data.title)} · ${g.w.length}문제</h2><div class="qlist">${g.w.map(q => reviewCard(g.u, q)).join('')}</div>`).join('') : '<p class="empty">틀린 문제가 없어요.</p>'}</div></div>`;
-  bindReview(all[0]);
+  bindReview();
 }
 
 /* ───────── 설정 ───────── */
@@ -442,11 +471,12 @@ $('#settingsBtn').onclick = () => {
   const bind = (id, key, parse) => $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; store.settings[key] = parse(b.dataset.v); save(); applySettings(); $$('button', $(id)).forEach(x => x.setAttribute('aria-pressed', x === b)); if (key === 'instant') toast('다음 문제부터 적용돼요'); });
   bind('#sTheme', 'theme', v => v); bind('#sFs', 'fs', Number); bind('#sIn', 'instant', v => v === 'true');
   $('#sExp').onclick = () => { const blob = new Blob([JSON.stringify(store, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'study-hub-progress.json'; a.click(); };
-  $('#sRst').onclick = () => { if (confirm('풀이 기록, 오답, ★ 표시를 모두 지웁니다. 설정은 유지돼요.')) { store.answers = {}; store.flags = {}; store.last = null; save(); closeSheet(); route(); toast('기록을 지웠어요'); } };
+  $('#sRst').onclick = () => { if (confirm('풀이 기록, 오답, ★ 표시를 모두 지웁니다. 설정은 유지돼요.')) { store.answers = {}; store.flags = {}; store.retry = {}; store.last = null; save(); closeSheet(); route(); toast('기록을 지웠어요'); } };
 };
 
 /* ───────── 라우터 ───────── */
 async function route() {
+  const my = ++routeSeq;
   const [path, qs] = (location.hash.slice(1) || '/').split('?'); const params = new URLSearchParams(qs || '');
   const seg = path.split('/').filter(Boolean);
   main.innerHTML = '<p class="loading">불러오는 중…</p>';
@@ -454,20 +484,22 @@ async function route() {
     if (!seg.length) await viewHome();
     else if (seg[0] === 'review') await viewAllReview();
     else {
-      const u = await getUnit(seg[0], seg[1]); const tab = seg[2] || 'read';
+      const u = await getUnit(seg[0], seg[1]); if (my !== routeSeq) return; const tab = seg[2] || 'read';
       if (tab === 'read') await viewRead(u, params);
       else if (tab === 'quiz') await viewQuiz(u, params);
       else if (tab === 'key') await viewKey(u, params);
       else if (tab === 'review') await viewReview(u);
       else await viewRead(u, params);
-      for (const x of unitCache.values()); updateBadge([...unitCache.values()]);
+      refreshBadge();
     }
     if (!params.get('s') && !params.get('q')) window.scrollTo(0, 0);
     main.focus({ preventScroll: true });
   } catch (err) {
+    if (my !== routeSeq) return;
     main.innerHTML = `<div class="wrap"><p class="empty">${esc(err.message)}<br><br><a class="btn" href="#/">홈으로</a></p></div>`;
   }
 }
-window.addEventListener('hashchange', () => { if (!$('#sheet').hidden) $('#sheet').hidden = true; route(); });
+window.addEventListener('hashchange', () => { if (!$('#sheet').hidden) closeSheet(false); route(); });
+addEventListener('storage', e => { if (e.key !== KEY || !e.newValue) return; try { store = normalize(JSON.parse(e.newValue)); applySettings(); } catch {} });
 applySettings();
 route();

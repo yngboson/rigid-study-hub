@@ -95,7 +95,12 @@ def validate_unit(path, expect_id, errors, warnings):
     _walk_sections(u.get("summary", []), sec_ids, name, errors)
 
     set_ids, q_ids = set(), set()
-    for st in u.get("sets", []):
+    if not isinstance(u.get("sets"), list) or not u["sets"]:
+        errors.append(f"{name}: sets 가 없거나 비어 있습니다 (앱이 문제풀이 화면에서 오류를 냅니다)")
+    for st in (u.get("sets") if isinstance(u.get("sets"), list) else []):
+        if not isinstance(st, dict):
+            errors.append(f"{name}: sets 항목이 객체가 아닙니다")
+            continue
         sid = st.get("id")
         if not sid:
             errors.append(f"{name}: 문제 세트 id 누락")
@@ -131,6 +136,18 @@ def validate_unit(path, expect_id, errors, warnings):
                 errors.append(f"{w}: ref {q.get('ref')!r} 가 존재하는 섹션 id 가 아닙니다")
             if kind == "fill_blank" and not BLANK_RE.search(stem):
                 errors.append(f"{w}: fill_blank 문제의 stem 에 {{빈칸}} 또는 {{㉠}} 표기가 없습니다")
+            if kind == "fill_blank":
+                labels = re.findall(r"\{([㉠-㉭])\}", stem)
+                plain = stem.count("{빈칸}")
+                if plain > 1 or (plain and labels) or (labels and (len(set(labels)) != len(labels) or labels != [chr(0x3260 + i) for i in range(len(labels))])):
+                    errors.append(f"{w}: 빈칸 표기가 모호합니다 ({{빈칸}} 은 1개, 또는 {{㉠}}부터 순서대로 중복 없이)")
+                elif labels and isinstance(ch, list):
+                    for c in ch:
+                        if isinstance(c, str) and set(re.findall(r"[㉠-㉭]", c)) != set(labels):
+                            errors.append(f"{w}: 선지 {c!r} 의 ㉠㉡ 라벨이 지문과 다릅니다")
+                            break
+            elif kind == "case" and BLANK_RE.search(stem):
+                errors.append(f"{w}: case 문제에 {{빈칸}}/{{㉠}} 표기가 남아 있습니다")
             if not isinstance(ch, list) or not (2 <= len(ch) <= 6):
                 errors.append(f"{w}: choices 는 2~6개 배열이어야 합니다")
                 continue
@@ -151,10 +168,31 @@ def validate_unit(path, expect_id, errors, warnings):
     return len(q_ids)
 
 
+BAD_EXT = {".pdf", ".ppt", ".pptx", ".hwp", ".hwpx", ".doc", ".docx"}
+
+
+def _validate_repo(root, errors, warnings):
+    """원본 강의 파일 유입, 큰 파일, 캐시 쿼리(?v=N) 불일치를 막는다."""
+    for f in root.rglob("*"):
+        if not f.is_file() or ".git" in f.relative_to(root).parts:
+            continue
+        rel = f.relative_to(root)
+        if f.suffix.lower() in BAD_EXT:
+            errors.append(f"원본 강의 자료로 보이는 파일이 있습니다(커밋 금지): {rel}")
+        elif f.stat().st_size > 1_000_000:
+            warnings.append(f"파일이 1MB 를 넘습니다(아이패드 로딩 고려): {rel}")
+    idx = root / "index.html"
+    if idx.exists():
+        v = set(re.findall(r"assets/app\.(?:css|js)\?v=(\d+)", idx.read_text(encoding="utf-8")))
+        if len(v) != 1:
+            errors.append(f"index.html 의 app.css/app.js ?v=N 값이 서로 다르거나 없습니다: {sorted(v)}")
+
+
 def validate(root=ROOT):
     """(errors, warnings, stats) 반환."""
     errors, warnings = [], []
     content = Path(root) / "content"
+    _validate_repo(Path(root), errors, warnings)
     manifest = _load(content / "index.json", errors)
     units = questions = 0
     if manifest is not None:

@@ -7,6 +7,7 @@
 """
 import argparse
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -93,13 +94,28 @@ def main():
     p.add_argument("--tags", help="쉼표 구분 (예: 중간고사,1부)")
     p.add_argument("--sources", help="원본 자료 파일명, 쉼표 구분")
     p.add_argument("--date", default=date.today().isoformat(), help="YYYY-MM-DD (기본: 오늘)")
+    p.add_argument("--force", action="store_true", help="이미 있는 단원 파일을 덮어쓴다 (수작업 세트·sources 가 사라질 수 있음)")
     args = p.parse_args()
+
+    for label, val in (("--course", args.course), ("--unit", args.unit)):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", val):
+            print(f"오류: {label} 는 소문자·숫자·하이픈만 쓸 수 있습니다: {val!r}", file=sys.stderr)
+            sys.exit(1)
+    try:
+        date.fromisoformat(args.date)
+    except ValueError:
+        print(f"오류: --date 는 YYYY-MM-DD 형식이어야 합니다: {args.date!r}", file=sys.stderr)
+        sys.exit(1)
+    target = ROOT / "content" / args.course / f"{args.unit}.json"
+    if target.exists() and not args.force:
+        print(f"오류: {target.relative_to(ROOT)} 가 이미 있습니다. 덮어쓰면 추가한 세트·sources 가 사라지므로 --force 가 필요합니다.", file=sys.stderr)
+        sys.exit(1)
 
     try:
         with open(args.src, encoding="utf-8") as f:
             src = json.load(f)
         unit = convert(src, args)
-    except (OSError, json.JSONDecodeError, KeyError) as e:
+    except (OSError, json.JSONDecodeError, KeyError, AttributeError, TypeError, ValueError) as e:
         print(f"오류: 입력 파일을 읽거나 변환하지 못했습니다: {e!r}", file=sys.stderr)
         sys.exit(1)
 

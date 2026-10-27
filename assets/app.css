@@ -5,7 +5,9 @@
   --paper-lo: #ECEEF2;
   --ink: #1D2433;
   --ink-2: #4A5366;
-  --ink-3: #7B8496;
+  --ink-3: #626B7E;
+  --on-omr: #fff;
+  --flag: #9A6B00;
   --rule: #D8DCE4;
   --omr: #C4314B;          /* OMR 카드의 빨간 인쇄선 */
   --omr-soft: #F7E3E7;
@@ -25,7 +27,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #14181F; --paper-hi: #1C222C; --paper-lo: #232A36;
-    --ink: #E6E9EE; --ink-2: #B3BAC7; --ink-3: #848D9E; --rule: #313949;
+    --ink: #E6E9EE; --ink-2: #B3BAC7; --ink-3: #848D9E; --rule: #313949; --on-omr: #1A0A0E; --flag: #F2C14E;
     --omr: #E86A82; --omr-soft: #3A2129;
     --mark: rgba(255, 226, 64, .32); --mark-ink: #FFF7C2;
     --ok: #4BC596; --ok-soft: #173329; --bad: #E86A82; --bad-soft: #3A2129;
@@ -35,7 +37,7 @@
 }
 :root[data-theme="dark"] {
   --paper: #14181F; --paper-hi: #1C222C; --paper-lo: #232A36;
-  --ink: #E6E9EE; --ink-2: #B3BAC7; --ink-3: #848D9E; --rule: #313949;
+  --ink: #E6E9EE; --ink-2: #B3BAC7; --ink-3: #848D9E; --rule: #313949; --on-omr: #1A0A0E; --flag: #F2C14E;
   --omr: #E86A82; --omr-soft: #3A2129;
   --mark: rgba(255, 226, 64, .32); --mark-ink: #FFF7C2;
   --ok: #4BC596; --ok-soft: #173329; --bad: #E86A82; --bad-soft: #3A2129;
@@ -76,10 +78,10 @@ button { font: inherit; color: inherit; }
   border: 0; background: transparent; cursor: pointer; color: var(--ink-2); text-decoration: none;
 }
 .icon-btn:hover { background: var(--paper-lo); color: var(--ink); }
-.badge { position: absolute; top: 4px; right: 3px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--omr); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.badge { position: absolute; top: 4px; right: 3px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--omr); color: var(--on-omr); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
 @media (max-width: 640px) { .brand span { display: none; } }
 
-main { outline: none; }
+main:focus, main:focus-visible { outline: none; }
 .wrap { max-width: 1180px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left)) 120px; }
 .loading, .empty { padding: 64px 16px; text-align: center; color: var(--ink-3); }
 
@@ -138,7 +140,7 @@ mark, .hl {
 .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .btn.primary:hover { opacity: .9; }
 .btn.omr { border-color: var(--omr); color: var(--omr); }
-.btn.omr.solid { background: var(--omr); color: #fff; }
+.btn.omr.solid { background: var(--omr); color: var(--on-omr); }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
 .btn.ghost:hover { background: var(--paper-lo); color: var(--ink); }
 .btn.sm { min-height: 32px; padding: 0 10px; font-size: .84em; border-radius: 7px; }
@@ -179,14 +181,14 @@ mark, .hl {
 .reader.toc-hidden .toc { display: none; }
 .toc-backdrop { display: none; }
 @media (max-width: 960px) {
-  .reader, .reader.toc-hidden { grid-template-columns: 1fr; }
+  .reader, .reader.toc-hidden { grid-template-columns: minmax(0, 1fr); }
   .reader.toc-hidden .toc { display: block; }
   .toc { position: fixed; z-index: 40; top: 0; bottom: 0; left: 0; width: min(82vw, 320px); max-height: none; padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); background: var(--paper-hi); border-right: 1.5px solid var(--omr); box-shadow: 12px 0 36px -18px rgba(0,0,0,.45); transform: translateX(-102%); transition: transform .22s ease; visibility: hidden; }
   .toc.open { transform: none; visibility: visible; }
   .toc-backdrop.open { display: block; position: fixed; z-index: 39; inset: 0; background: rgba(0,0,0,.35); }
 }
 @media (prefers-reduced-motion: reduce) { .toc { transition: none; } }
-.doc { max-width: 74ch; }
+.doc { max-width: 74ch; min-width: 0; }
 .doc section { scroll-margin-top: 76px; }
 .doc h2 { font-size: 1.45rem; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--ink); letter-spacing: -.02em; }
 .doc > section:first-child > h2 { margin-top: 0; }
@@ -213,7 +215,7 @@ mark, .hl {
 /* ---------- quiz ---------- */
 .quiz-layout.solo { display: block; }
 .quiz-layout:not(.solo) { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 32px; align-items: start; }
-@media (max-width: 960px) { .quiz-layout { grid-template-columns: 1fr; } }
+@media (max-width: 960px) { .quiz-layout, .quiz-layout:not(.solo) { grid-template-columns: minmax(0, 1fr); } .quiz-layout:not(.solo) { padding-bottom: 80px; } }
 .qlist { display: flex; flex-direction: column; gap: 18px; max-width: 78ch; }
 .q {
   scroll-margin-top: 80px; background: var(--paper-hi); border: 1px solid var(--rule); border-radius: var(--radius-m);
@@ -227,7 +229,7 @@ mark, .hl {
 .q-state.bad { color: var(--bad); background: var(--bad-soft); }
 .q-state.pending { color: var(--ink-3); background: var(--paper-lo); }
 .q-flag { margin-left: auto; }
-.q-flag[aria-pressed="true"] { color: #D69A00; }
+.q-flag[aria-pressed="true"] { color: var(--flag); }
 .stem { margin: 0 0 14px; white-space: pre-line; }
 .choices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .choice {
@@ -258,12 +260,12 @@ mark, .hl {
 
 /* OMR answer card (the memorable piece) */
 .omr-card {
-  position: sticky; top: 76px; background: var(--paper-hi); border: 1.5px solid var(--omr); border-radius: 8px; padding: 12px;
+  position: sticky; top: 76px; max-height: calc(100vh - 92px); max-height: calc(100dvh - 92px); overflow: auto; background: var(--paper-hi); border: 1.5px solid var(--omr); border-radius: 8px; padding: 12px;
   font-size: .82em;
 }
 .omr-card h2 { font-size: 1em; margin: 0 0 2px; color: var(--omr); letter-spacing: .02em; }
 .omr-card .omr-sub { color: var(--ink-3); margin: 0 0 10px; }
-.omr-grid { display: grid; grid-template-columns: 2.2em repeat(5, 1fr); gap: 0; border-top: 1px solid var(--omr); max-height: calc(100vh - 330px); overflow: auto; }
+.omr-grid { display: grid; grid-template-columns: 2.2em repeat(5, 1fr); gap: 0; border-top: 1px solid var(--omr); max-height: max(140px, calc(100vh - 430px)); max-height: max(140px, calc(100dvh - 430px)); overflow: auto; }
 .omr-row { display: contents; }
 .omr-row > * { display: grid; place-items: center; height: 30px; border-bottom: 1px solid color-mix(in srgb, var(--omr) 35%, transparent); }
 .omr-row:nth-child(5n) > * { border-bottom-color: var(--omr); }
@@ -281,7 +283,8 @@ mark, .hl {
 @media (max-width: 960px) {
   .omr-card { position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; top: auto; border-radius: 14px 14px 0 0; border-width: 1.5px 0 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px -16px rgba(0,0,0,.35); }
   .omr-card:not(.open) .omr-grid, .omr-card:not(.open) .omr-sub, .omr-card:not(.open) .omr-actions .more { display: none; }
-  .omr-card .omr-grid { max-height: 38vh; }
+  .omr-card { max-height: none; overflow: visible; }
+  .omr-card .omr-grid { max-height: 30vh; }
   .omr-card h2 { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
   .omr-actions { grid-template-columns: 1fr 1fr; }
 }
@@ -345,7 +348,12 @@ mark, .hl {
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media print {
-  .topbar, .toc, .omr-card, .q-actions, .toolbar, .tabs { display: none !important; }
+  :root:root { --paper:#fff; --paper-hi:#fff; --paper-lo:#eee; --ink:#000; --ink-2:#222; --ink-3:#444; --rule:#bbb; --mark:#FFE94D; color-scheme: light; }
+  body { background:#fff; font-size: 12pt; }
+  mark, .choice.right { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .topbar, .toc, .toc-backdrop, .omr-card, .q-actions, .toolbar, .tabs, .sheet, .toast, .skip, .sec-qs, .set-pick, .q-flag, .resume { display: none !important; }
+  .wrap { padding: 0; max-width: none; }
+  .doc { max-width: none; }
   .reader, .quiz-layout { display: block; }
   .q, .unit { box-shadow: none; break-inside: avoid; }
 }
@@ -371,6 +379,20 @@ mark, .hl {
 
 /* 오답 많은 개념 표시 */
 .weak { display: inline-block; font-size: .72rem; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--bad); color: var(--bad); background: transparent; white-space: nowrap; letter-spacing: 0; vertical-align: middle; }
-.weak.hot { background: var(--bad); color: #fff; }
+.weak.hot { background: var(--bad); color: var(--on-omr); }
 .weak.sm { margin-left: 6px; font-size: .68rem; padding: 2px 6px; }
 .doc h2 .weak, .doc h3 .weak, .doc h4 .weak { align-self: center; }
+
+@media (max-width: 520px) {
+  .tabs a { padding: 10px 10px 9px; font-size: .94em; }
+  .wrap { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+}
+@media (pointer: coarse) {
+  .btn, .btn.sm { min-height: 44px; }
+  .icon-btn { min-width: 44px; min-height: 44px; }
+  .seg button { min-height: 44px; }
+  .toc a { padding: 10px 8px; }
+  .crumbs a { padding: 10px 0; }
+  .omr-row > * { height: 40px; }
+  .omr-n { min-width: 44px; }
+}
