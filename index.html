@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rigid Study Hub</title>
+<meta name="description" content="형광펜 강의록으로 만든 개념 요약과 문제풀이">
+<meta name="theme-color" content="#F5F6F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14181F" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='22' rx='3' fill='%23fff' stroke='%23C4314B' stroke-width='2'/%3E%3Cellipse cx='11' cy='16' rx='4' ry='5.5' fill='%231D2433'/%3E%3Cellipse cx='21' cy='16' rx='4' ry='5.5' fill='none' stroke='%23C4314B' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="topbar">
+  <a class="brand" href="#/" aria-label="홈으로">
+    <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect x="3" y="5" width="26" height="22" rx="3" fill="var(--paper-hi)" stroke="var(--omr)" stroke-width="2"/><ellipse cx="11" cy="16" rx="4" ry="5.5" fill="var(--ink)"/><ellipse cx="21" cy="16" rx="4" ry="5.5" fill="none" stroke="var(--omr)" stroke-width="1.6"/></svg>
+    <span>Rigid Study Hub</span>
+  </a>
+  <nav class="crumbs" id="crumbs" aria-label="현재 위치"></nav>
+  <div class="top-actions">
+    <a class="icon-btn" href="#/review" title="전체 오답노트" aria-label="전체 오답노트">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 4h11l3 3v13H5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 11l6 6M15 11l-6 6" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span class="badge" id="wrongBadge" hidden></span>
+    </a>
+    <button class="icon-btn" id="settingsBtn" title="설정" aria-label="설정" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main" tabindex="-1"></main>
+
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-backdrop" data-close></div>
+  <div class="sheet-panel">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">개념</h2>
+      <button class="icon-btn" data-close aria-label="닫기">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="assets/app.js" type="module"></script>
+<noscript>이 사이트는 자바스크립트가 필요합니다.</noscript>
+</body>
+</html>
