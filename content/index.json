@@ -19,6 +19,23 @@
     }
    ],
    "badge": "스캠"
+  },
+  {
+   "id": "startup-law",
+   "title": "창업과실용법률",
+   "units": [
+    {
+     "id": "final-9-14",
+     "title": "기말고사 · 9~14주차",
+     "subtitle": "사업타당성·사업계획서·창업법률·자금조달·디자인·특허",
+     "file": "startup-law/final-9-14.json",
+     "updated": "2026-10-28",
+     "tags": [
+      "기말고사"
+     ]
+    }
+   ],
+   "badge": "스캠"
   }
  ]
 }
