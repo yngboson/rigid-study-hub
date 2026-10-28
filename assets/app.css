@@ -396,3 +396,5 @@ mark, .hl {
   .omr-row > * { height: 40px; }
   .omr-n { min-width: 44px; }
 }
+
+.cbadge { display: inline-block; margin-left: 10px; padding: 3px 9px; border-radius: 999px; background: var(--bad); color: var(--on-omr); font-size: .72rem; font-weight: 800; letter-spacing: .02em; vertical-align: middle; transform: rotate(-3deg); }

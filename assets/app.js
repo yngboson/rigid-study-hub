@@ -144,7 +144,7 @@ async function viewHome() {
     <div class="hero"><div><h1>${esc(m.site?.title || 'Study Hub')}</h1><p>형광펜 친 강의록을 개념 요약과 문제로 바꿔 둔 공부방. 읽다가 막히면 문제로, 틀리면 개념으로 바로 이동합니다.</p></div>
     <div class="hero-stats"><div><b>${all.length}</b><span>단원</span></div><div><b>${totalQ}</b><span>문제</span></div><div><b>${doneQ}</b><span>푼 문제</span></div></div></div>
     ${last ? `<a class="resume" href="${esc(last.href)}"><div><b>이어서 공부하기</b><small>${esc(last.title || '')}</small></div><span class="go">계속 ›</span></a>` : ''}
-    ${m.courses.map(c => `<section class="course"><h2>${esc(c.title)}</h2><div class="units">${c.units.map(meta => {
+    ${m.courses.map(c => `<section class="course"><h2>${esc(c.title)}${c.badge ? `<span class="cbadge">⚠ ${esc(c.badge)}</span>` : ''}</h2><div class="units">${c.units.map(meta => {
       const u = unitCache.get(`${c.id}/${meta.id}`); if (!u) return ''; const st = unitStats(u); const pct = x => (x / st.total * 100).toFixed(1);
       return `<article class="unit"><div><h3>${esc(meta.title)}</h3>${meta.subtitle ? `<p class="sub">${esc(meta.subtitle)}</p>` : ''}</div>
       <div class="meta"><span class="chip">문제 ${st.total}</span><span class="chip">요약 ${u.flat.length}절</span>${(meta.tags || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')}<span class="chip">${esc(meta.updated || '')}</span></div>
@@ -173,7 +173,7 @@ function remember(u, tab, href) { store.last = { unit: u.key, title: u.data.titl
 
 /* ───────── 화면: 개념 리더 ───────── */
 async function viewRead(u, params) {
-  setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title }]);
+  setCrumbs([{ t: u.course.title + (u.course.badge ? ` ⚠ ${u.course.badge}` : ''), href: '#/' }, { t: u.data.title }]);
   remember(u, 'read', `#/${u.cid}/${u.uid}/read`);
   document.title = u.data.title + ' · 개념';
   const toc = (list) => '<ol>' + list.map(s => `<li><a href="#/${u.cid}/${u.uid}/read?s=${encodeURIComponent(s.id)}" data-toc="${esc(s.id)}"><span class="sid">§${esc(s.id)}</span>${esc(s.title)}${weakBadge(badOf(u, s.id), 'sm')}</a>${s.sections?.length ? toc(s.sections) : ''}</li>`).join('') + '</ol>';
@@ -268,7 +268,7 @@ let quizState = null;
 async function viewQuiz(u0, params) {
   let u = u0;
   if (params.get('only') === 'retry') u = { ...u0, key: u0.key + '#retry', base: u0.key, retry: true };
-  setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '문제풀이' }]);
+  setCrumbs([{ t: u.course.title + (u.course.badge ? ` ⚠ ${u.course.badge}` : ''), href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '문제풀이' }]);
   document.title = u.data.title + ' · 문제풀이';
   const setId = params.get('set') || u.data.sets[0].id; const refF = params.get('ref'); const only = params.get('only'); const mode = params.get('mode') === 'exam' ? 'exam' : 'study';
   let set = u.data.sets.find(s => s.id === setId) || u.data.sets[0];
@@ -396,7 +396,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet
 
 /* ───────── 화면: 답지·해설 ───────── */
 async function viewKey(u, params) {
-  setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '답지·해설' }]);
+  setCrumbs([{ t: u.course.title + (u.course.badge ? ` ⚠ ${u.course.badge}` : ''), href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '답지·해설' }]);
   document.title = u.data.title + ' · 답지';
   remember(u, 'key', `#/${u.cid}/${u.uid}/key`);
   const covered = params.get('show') !== '1';
@@ -427,7 +427,7 @@ function reviewCard(u, q) {
   <div class="q-actions"><button class="btn sm" data-r="concept">개념 보기 §${esc(q.ref)}</button><a class="btn sm" href="#/${u.cid}/${u.uid}/quiz?set=${q._set.id}&q=${encodeURIComponent(q.id)}">다시 풀기</a><button class="btn sm ghost" data-r="clear">오답에서 지우기</button></div></article>`;
 }
 async function viewReview(u) {
-  setCrumbs([{ t: u.course.title, href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '오답노트' }]);
+  setCrumbs([{ t: u.course.title + (u.course.badge ? ` ⚠ ${u.course.badge}` : ''), href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '오답노트' }]);
   document.title = u.data.title + ' · 오답노트'; remember(u, 'review', `#/${u.cid}/${u.uid}/review`);
   const wrong = [...u.qs.values()].filter(q => { const a = ansOf(u.key, q.id); return a != null && a !== q.answer; });
   const rl = (store.retry[u.key] || []).filter(id => u.qs.has(id)); const resumeDone = rl.filter(id => ansOf(u.key + '#retry', id) != null).length; const resume = rl.length > 0 && resumeDone < rl.length;
