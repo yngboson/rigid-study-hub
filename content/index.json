@@ -4,6 +4,23 @@
  },
  "courses": [
   {
+   "id": "solid-mech-2",
+   "title": "고체역학 II",
+   "units": [
+    {
+     "id": "exam-2-concepts",
+     "title": "2차 시험 · 10분 개념",
+     "subtitle": "모어원·변형률·파손이론·보 설계·처짐/부정정",
+     "file": "solid-mech-2/exam-2-concepts.json",
+     "updated": "2026-10-29",
+     "tags": [
+      "2차 시험",
+      "10분 요약"
+     ]
+    }
+   ]
+  },
+  {
    "id": "psych",
    "title": "심리학",
    "units": [
