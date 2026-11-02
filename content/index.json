@@ -50,6 +50,17 @@
      "tags": [
       "기말고사"
      ]
+    },
+    {
+     "id": "final-jokbo-pack",
+     "title": "기말 족보팩 · 9~14강",
+     "subtitle": "족보 47~97 · 후기 보충 · N제 70 · 핵심정리",
+     "file": "startup-law/final-jokbo-pack.json",
+     "updated": "2026-11-02",
+     "tags": [
+      "기말고사",
+      "족보"
+     ]
     }
    ],
    "badge": "스캠"
