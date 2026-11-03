@@ -406,3 +406,15 @@ mark, .hl {
 #loginBtn[data-state="err"] .sync-dot { background: var(--bad); }
 .id-input { width: 100%; margin-top: 8px; min-height: 40px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-hi); color: var(--ink); font: inherit; }
 @media (pointer: coarse) { .id-input { min-height: 44px; font-size: 16px; } }
+
+.q-rate { font-size: .78em; color: var(--ink-3); margin-left: auto; }
+.q-rate:empty { display: none; }
+.q-rate ~ .q-flag { margin-left: 0; }
+.ppl { border-bottom: 1px solid var(--rule); padding: 10px 0; }
+.ppl summary { cursor: pointer; display: grid; gap: 4px; list-style: none; }
+.ppl summary::-webkit-details-marker { display: none; }
+.ppl-sum { color: var(--ink-3); font-size: .86em; }
+.ppl-bar { margin: 0 !important; border-radius: 3px; overflow: hidden; }
+.ppl ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.ppl li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: .9em; }
+.ppl li span { color: var(--ink-3); white-space: nowrap; }

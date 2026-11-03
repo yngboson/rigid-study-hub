@@ -242,6 +242,7 @@ function qCard(u, q, mode) {
   return `<article class="q" id="q-${esc(q.id)}" data-qid="${esc(q.id)}" tabindex="-1">
     <div class="q-top"><span class="q-no">${q._n}.</span>
       <span class="q-state ${show ? (ok ? 'ok' : 'bad') : 'pending'}">${show ? (ok ? '정답' : '오답') : answered ? '선택함' : '미응답'}</span>
+      <span class="q-rate" data-k="${esc(u.base || u.key)}|${esc(q.id)}" data-a="${q.answer}"></span>
       <button class="btn sm ghost q-flag" data-act="flag" aria-pressed="${flagged}" aria-label="나중에 다시 보기 표시" title="나중에 다시">${flagged ? '★' : '☆'}</button></div>
     <p class="stem">${md(q.stem)}</p>
     <ol class="choices" role="radiogroup" aria-label="${q._n}번 보기">${q.choices.map((c, i) => {
@@ -546,6 +547,55 @@ document.addEventListener('visibilitychange', async () => {
 });
 addEventListener('pagehide', () => { if (pushTimer) push(true); });
 
+/* ───────── 모두의 진도 · 문제별 정답률 (동기화된 모든 아이디를 읽는다) ───────── */
+let allUsers = null, allAt = 0;
+async function getAllUsers(force = false) {
+  if (!syncOn) return null;
+  if (!force && allUsers && Date.now() - allAt < 60000) return allUsers;
+  try { const r = await fetch(`${SYNC_URL}/users.json`); if (!r.ok) throw 0; allUsers = (await r.json()) || {}; allAt = Date.now(); } catch {}
+  return allUsers;
+}
+let rateMap = null;
+function buildRates() {
+  rateMap = new Map();
+  for (const u of Object.values(allUsers || {})) for (const [k, v] of Object.entries(u?.data?.answers || {})) {
+    if (k.includes('#')) continue; // 오답 재풀이 기록 제외
+    (rateMap.get(k) || rateMap.set(k, []).get(k)).push(v);
+  }
+}
+let paintQueued = false;
+function paintRates() {
+  paintQueued = false; if (!rateMap) return;
+  for (const el of $$('.q-rate:empty')) {
+    const picks = rateMap.get(el.dataset.k); if (!picks?.length) continue;
+    const ok = picks.filter(v => v === +el.dataset.a).length;
+    el.textContent = `정답률 ${Math.round(ok / picks.length * 100)}% · ${picks.length}명`;
+  }
+}
+new MutationObserver(() => { if (!paintQueued) { paintQueued = true; queueMicrotask(paintRates); } }).observe(main, { childList: true, subtree: true });
+async function loadRates() { if (await getAllUsers()) { buildRates(); paintRates(); } }
+
+async function viewPeople() {
+  setCrumbs([{ t: '홈', href: '#/' }, { t: '모두의 진도' }]); document.title = '모두의 진도';
+  const seq = routeSeq;
+  if (!syncOn) { main.innerHTML = '<div class="wrap"><p class="empty">동기화 서버가 설정되지 않았어요.</p></div>'; return; }
+  const [users, units] = await Promise.all([getAllUsers(true), loadAllUnits()]); if (seq !== routeSeq) return;
+  if (!users) { main.innerHTML = '<div class="wrap"><p class="empty">불러오지 못했어요.<br><br><a class="btn" href="#/people">다시 시도</a></p></div>'; return; }
+  buildRates();
+  const rows = Object.entries(users).map(([id, v]) => {
+    const ans = v?.data?.answers || {}; let done = 0, ok = 0;
+    const per = units.map(u => { let d = 0, o = 0; for (const q of u.qs.values()) { const a = ans[`${u.key}|${q.id}`]; if (a != null) { d++; if (a === q.answer) o++; } } done += d; ok += o; return { u, d, o }; });
+    return { id, t: v?.t || 0, done, ok, per };
+  }).sort((a, b) => b.done - a.done || b.ok - a.ok);
+  const total = units.reduce((a, u) => a + u.qs.size, 0);
+  const ago = t => { if (!t) return ''; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
+  main.innerHTML = `<div class="wrap"><div class="hero"><div><h1>모두의 진도</h1><p>로그인해서 동기화한 아이디만 보여요 · 총 ${total}문제</p></div></div>
+  ${rows.length ? rows.map(r => `<details class="ppl"${r.id === uid ? ' open' : ''}><summary><b>${esc(r.id)}</b>${r.id === uid ? ' <small>(나)</small>' : ''}
+    <span class="ppl-sum">${r.done}/${total}문제 · 정답률 ${r.done ? Math.round(r.ok / r.done * 100) : 0}%${r.t ? ' · ' + ago(r.t) : ''}</span>
+    <span class="sb-bar ppl-bar"><i class="ok" style="width:${r.ok / (total || 1) * 100}%"></i><i class="no" style="width:${(r.done - r.ok) / (total || 1) * 100}%"></i></span></summary>
+    <ul>${r.per.map(x => `<li><a href="#/${x.u.cid}/${x.u.uid}/quiz">${esc(x.u.course.title)} · ${esc(x.u.data.title)}</a><span>${x.d}/${x.u.qs.size} · ${x.d ? Math.round(x.o / x.d * 100) : 0}%</span></li>`).join('')}</ul></details>`).join('') : '<p class="empty">아직 동기화한 사람이 없어요.</p>'}</div>`;
+}
+
 /* ───────── 라우터 ───────── */
 async function route() {
   const my = ++routeSeq;
@@ -555,6 +605,7 @@ async function route() {
   try {
     if (!seg.length) await viewHome();
     else if (seg[0] === 'review') await viewAllReview();
+    else if (seg[0] === 'people') await viewPeople();
     else {
       const u = await getUnit(seg[0], seg[1]); if (my !== routeSeq) return; const tab = seg[2] || 'read';
       if (tab === 'read') await viewRead(u, params);
@@ -566,6 +617,7 @@ async function route() {
     }
     if (!params.get('s') && !params.get('q')) window.scrollTo(0, 0);
     main.focus({ preventScroll: true });
+    if (seg[0] !== 'people') loadRates();
   } catch (err) {
     if (my !== routeSeq) return;
     main.innerHTML = `<div class="wrap"><p class="empty">${esc(err.message)}<br><br><a class="btn" href="#/">홈으로</a></p></div>`;
@@ -575,6 +627,7 @@ window.addEventListener('hashchange', () => { if (!$('#sheet').hidden) closeShee
 addEventListener('storage', e => { if (e.key !== KEY || !e.newValue) return; try { store = normalize(JSON.parse(e.newValue)); applySettings(); } catch {} });
 applySettings();
 $('#loginBtn').onclick = openAccount;
+$('#peopleBtn').hidden = !syncOn;
 setSyncState(uid ? 'idle' : 'off');
 route();
 if (uid) pull(true).then(ch => { if (ch) route(); });
