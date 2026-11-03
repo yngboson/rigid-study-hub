@@ -497,14 +497,18 @@ const pack = () => ({ answers: mapK(store.answers, kEnc), flags: mapK(store.flag
 const unpack = d => ({ ...d, answers: mapK(d?.answers, kDec), flags: mapK(d?.flags, kDec), retry: mapK(d?.retry, kDec) });
 const localPack = () => ({ answers: store.answers, flags: store.flags, retry: store.retry, last: store.last });
 function setSyncState(st) { syncState = st; const b = $('#loginBtn'); if (b) { b.dataset.state = uid ? st : 'off'; b.title = uid ? `${uid} · ${({ ok: '동기화됨', busy: '동기화 중…', err: '동기화 실패 (이 기기엔 저장됨)', idle: '로그인됨' })[st]}` : '로그인 (진도 동기화)'; } }
-function schedulePush() { if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = setTimeout(() => push(), 1500); }
+function schedulePush() { if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = setTimeout(() => push(), 300); } // 문제 하나 풀 때마다 거의 즉시 올린다
+let pushing = false, dirty = false;
 async function push(keep = false) {
-  if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = null; setSyncState('busy');
+  if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = null;
+  if (pushing) { dirty = true; return; } // 전송 중이면 끝난 뒤 최신 상태로 한 번 더
+  pushing = true; setSyncState('busy');
   const t = Date.now();
   try {
     const r = await fetch(uurl(uid), { method: 'PATCH', keepalive: keep, body: JSON.stringify({ data: pack(), t }) });
     if (!r.ok) { console.warn('sync push', r.status, await r.text()); throw 0; } lastT = t; setSyncState('ok');
   } catch { setSyncState('err'); }
+  pushing = false; if (dirty) { dirty = false; push(keep); }
 }
 const mergeStores = (remote, local) => {
   const out = { answers: { ...(remote.answers || {}), ...local.answers }, flags: { ...(remote.flags || {}), ...local.flags }, retry: { ...(remote.retry || {}) }, last: local.last || remote.last || null };
