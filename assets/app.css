@@ -398,3 +398,11 @@ mark, .hl {
 }
 
 .cbadge { display: inline-block; margin-left: 10px; padding: 3px 9px; border-radius: 999px; background: var(--bad); color: var(--on-omr); font-size: .72rem; font-weight: 800; letter-spacing: .02em; vertical-align: middle; transform: rotate(-3deg); }
+
+/* ---------- 로그인 / 동기화 ---------- */
+.sync-dot { position: absolute; top: 7px; right: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); border: 2px solid var(--paper); display: none; }
+#loginBtn:not([data-state="off"]) .sync-dot { display: block; }
+#loginBtn[data-state="busy"] .sync-dot, #loginBtn[data-state="idle"] .sync-dot { background: var(--flag); }
+#loginBtn[data-state="err"] .sync-dot { background: var(--bad); }
+.id-input { width: 100%; margin-top: 8px; min-height: 40px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-hi); color: var(--ink); font: inherit; }
+@media (pointer: coarse) { .id-input { min-height: 44px; font-size: 16px; } }

@@ -17,7 +17,7 @@ function normalize(raw) {
 }
 try { store = normalize(JSON.parse(localStorage.getItem(KEY) || '{}')); }
 catch { store = structuredClone(defaults); }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} schedulePush(); };
 const ansOf = (u, qid) => store.answers[`${u}|${qid}`];
 const setAns = (u, qid, v) => { if (v == null) delete store.answers[`${u}|${qid}`]; else store.answers[`${u}|${qid}`] = v; save(); };
 
@@ -474,6 +474,78 @@ $('#settingsBtn').onclick = () => {
   $('#sRst').onclick = () => { if (confirm('풀이 기록, 오답, ★ 표시를 모두 지웁니다. 설정은 유지돼요.')) { store.answers = {}; store.flags = {}; store.retry = {}; store.last = null; save(); closeSheet(); route(); toast('기록을 지웠어요'); } };
 };
 
+/* ───────── 아이디 로그인 · 진도 동기화 (비번 없음, 선택 기능) ─────────
+   로그인하지 않으면 예전처럼 이 브라우저에만 저장된다. 아이디를 입력하면 진도(answers/flags/retry/last)를
+   Firebase Realtime Database(REST)에 올려 기기 간 동기화한다. 설정(테마 등)은 기기별로 둔다. */
+const SYNC_URL = ''; // 예: 'https://내프로젝트-default-rtdb.firebaseio.com'  (끝에 / 없이)
+const UID_KEY = 'rsh:uid', ID_RE = /^[0-9A-Za-z가-힣_-]{1,20}$/;
+const syncOn = !!SYNC_URL;
+const cookieGet = () => (document.cookie.match(/(?:^|; )rsh_uid=([^;]*)/) || [])[1];
+const readUid = () => { let v = null; try { v = localStorage.getItem(UID_KEY); } catch {} if (!v) { try { v = decodeURIComponent(cookieGet() || ''); } catch {} } return v && ID_RE.test(v) ? v : null; };
+const writeUid = v => {
+  try { v ? localStorage.setItem(UID_KEY, v) : localStorage.removeItem(UID_KEY); } catch {}
+  document.cookie = v ? `rsh_uid=${encodeURIComponent(v)}; max-age=31536000; path=/; samesite=lax` : 'rsh_uid=; max-age=0; path=/';
+};
+let uid = readUid(), syncState = 'idle', pushTimer = null, lastT = 0, pulling = false;
+const uurl = (id, sub = '') => `${SYNC_URL}/users/${encodeURIComponent(id)}${sub}.json`;
+const pack = () => ({ answers: store.answers, flags: store.flags, retry: store.retry, last: store.last });
+function setSyncState(st) { syncState = st; const b = $('#loginBtn'); if (b) { b.dataset.state = uid ? st : 'off'; b.title = uid ? `${uid} · ${({ ok: '동기화됨', busy: '동기화 중…', err: '동기화 실패 (이 기기엔 저장됨)', idle: '로그인됨' })[st]}` : '로그인 (진도 동기화)'; } }
+function schedulePush() { if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = setTimeout(() => push(), 1500); }
+async function push(keep = false) {
+  if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = null; setSyncState('busy');
+  const t = Date.now();
+  try {
+    const r = await fetch(uurl(uid), { method: 'PATCH', keepalive: keep, body: JSON.stringify({ data: pack(), t }) });
+    if (!r.ok) throw 0; lastT = t; setSyncState('ok');
+  } catch { setSyncState('err'); }
+}
+const mergeStores = (remote, local) => {
+  const out = { answers: { ...(remote.answers || {}), ...local.answers }, flags: { ...(remote.flags || {}), ...local.flags }, retry: { ...(remote.retry || {}) }, last: local.last || remote.last || null };
+  for (const [k, v] of Object.entries(local.retry || {})) out.retry[k] = [...new Set([...(out.retry[k] || []), ...v])];
+  return out;
+};
+const applyRemote = d => { const n = normalize({ ...d, settings: store.settings }); Object.assign(store, { answers: n.answers, flags: n.flags, retry: n.retry, last: n.last }); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
+async function pull(first = false) { // first: 로그인 직후 → 로컬과 병합, 이후: 서버가 더 새로우면 그대로 가져옴
+  if (!uid || !syncOn || pulling) return false; pulling = true; setSyncState('busy');
+  try {
+    const r = await fetch(uurl(uid)); if (!r.ok) throw 0; const j = await r.json(); pulling = false;
+    if (!j) { await push(); return true; } // 신규 가입: 지금 진도를 올린다
+    if (first) { applyRemote(mergeStores(j.data || {}, pack())); await push(); return true; }
+    if ((j.t || 0) > lastT) { lastT = j.t || 0; applyRemote(j.data || {}); setSyncState('ok'); return true; }
+    setSyncState('ok'); return false;
+  } catch { pulling = false; setSyncState('err'); return false; }
+}
+async function login(id) {
+  id = id.trim(); if (!ID_RE.test(id)) { toast('아이디는 한글·영문·숫자·_- 20자까지예요'); return false; }
+  uid = id; writeUid(id); lastT = 0; await pull(true); closeSheet(false); route(); toast(`${id} 로 동기화 중이에요`); return true;
+}
+function logout() { if (uid) push(true); uid = null; writeUid(null); lastT = 0; setSyncState('off'); }
+async function listUsers() { const r = await fetch(`${SYNC_URL}/users.json?shallow=true`); if (!r.ok) throw 0; return Object.keys((await r.json()) || {}).sort(); }
+async function openAccount() {
+  const row = (id) => `<div class="set-row"><p><b>${esc(id)}</b>${id === uid ? ' <small style="display:inline">(나)</small>' : ''}</p><button class="btn sm" data-del="${esc(id)}">삭제</button></div>`;
+  if (!syncOn) { openSheet('로그인', '<p class="empty" style="padding:24px 0">동기화 서버가 아직 설정되지 않았어요.<br><small>app.js 의 SYNC_URL 을 채우면 켜져요.</small></p>'); return; }
+  const head = uid
+    ? `<div class="set-row"><div><p><b>${esc(uid)}</b><small>로그인됨 · 진도가 자동으로 동기화돼요</small></p></div><div><button class="btn sm" id="aSync">지금 동기화</button> <button class="btn sm" id="aOut">로그아웃</button></div></div>`
+    : `<form id="aForm" class="set-row" style="gap:8px"><div style="flex:1"><p><b>아이디만 입력하면 끝</b><small>없는 아이디면 바로 가입돼요. 비밀번호 없음 — 같은 아이디를 치면 누구나 같은 진도를 봐요.</small></p><input id="aId" class="id-input" maxlength="20" autocomplete="username" autocapitalize="off" placeholder="아이디" aria-label="아이디"></div><button class="btn primary" type="submit">시작</button></form>`;
+  openSheet('로그인 · 진도 동기화', head + '<div id="aList"><p class="empty" style="padding:16px 0">계정 목록 불러오는 중…</p></div>');
+  $('#aForm')?.addEventListener('submit', e => { e.preventDefault(); login($('#aId').value); });
+  $('#aOut')?.addEventListener('click', () => { logout(); closeSheet(false); route(); toast('로그아웃했어요'); });
+  $('#aSync')?.addEventListener('click', async () => { await push(); await pull(); route(); toast(syncState === 'err' ? '동기화 실패' : '동기화했어요'); });
+  $('#aList').addEventListener('click', async e => {
+    const b = e.target.closest('[data-del]'); if (!b) return; const id = b.dataset.del;
+    if (!confirm(`아이디 "${id}" 와 저장된 진도를 삭제할까요? 되돌릴 수 없어요.`)) return;
+    try { const r = await fetch(uurl(id), { method: 'DELETE' }); if (!r.ok) throw 0; if (id === uid) { logout(); closeSheet(false); route(); } else b.closest('.set-row').remove(); toast('삭제했어요'); } catch { toast('삭제 실패'); }
+  });
+  try { const ids = await listUsers(); if ($('#aList')) $('#aList').innerHTML = `<h3 style="margin:16px 0 0;font-size:.95em">등록된 아이디 ${ids.length}개</h3>` + (ids.map(row).join('') || '<p class="empty" style="padding:16px 0">아직 없어요.</p>'); }
+  catch { if ($('#aList')) $('#aList').innerHTML = '<p class="empty" style="padding:16px 0">목록을 불러오지 못했어요.</p>'; }
+}
+document.addEventListener('visibilitychange', async () => {
+  if (!uid) return;
+  if (document.visibilityState === 'hidden') { if (pushTimer) push(true); }
+  else if (await pull()) route();
+});
+addEventListener('pagehide', () => { if (pushTimer) push(true); });
+
 /* ───────── 라우터 ───────── */
 async function route() {
   const my = ++routeSeq;
@@ -502,4 +574,7 @@ async function route() {
 window.addEventListener('hashchange', () => { if (!$('#sheet').hidden) closeSheet(false); route(); });
 addEventListener('storage', e => { if (e.key !== KEY || !e.newValue) return; try { store = normalize(JSON.parse(e.newValue)); applySettings(); } catch {} });
 applySettings();
+$('#loginBtn').onclick = openAccount;
+setSyncState(uid ? 'idle' : 'off');
 route();
+if (uid) pull(true).then(ch => { if (ch) route(); });

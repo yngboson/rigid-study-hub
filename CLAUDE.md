@@ -14,6 +14,6 @@
 - 한국어로 소통한다. 사용자는 아이패드로 보는 일이 많다 → 가볍게 유지, 큰 이미지·폰트 파일 추가 금지.
 - 프런트(`index.html`, `assets/`)는 의존성 없는 순수 JS/CSS. 빌드 단계를 추가하지 않는다.
 - 변경 후 로컬 확인: `python3 -m http.server` 후 `http://localhost:8000`.
-- 진도·오답은 사용자 브라우저 localStorage(`rsh:v1`)에만 저장된다. 서버 저장 기능을 임의로 추가하지 않는다.
+- 진도·오답은 기본적으로 사용자 브라우저 localStorage(`rsh:v1`)에 저장된다. 예외로, 사용자가 요청해 만든 **아이디 로그인 동기화**(비번 없음, 누구나 관리자)가 있다: 우측 상단 로그인 버튼 → 아이디 입력 → `app.js`의 `SYNC_URL`(Firebase Realtime Database REST, 규칙 공개)로 진도 동기화. `SYNC_URL`이 비어 있으면 꺼진 상태. 그 외 서버 저장 기능은 임의로 추가하지 않는다.
 - GitHub GraphQL은 세션에서 막혀 있다. `gh api repos/...` REST만 쓴다.
 - `assets/` 를 고치면 `index.html`의 `app.css?v=N`, `app.js?v=N`의 N을 올린다 (Pages 캐시 때문에 옛 파일이 남는 걸 방지).
