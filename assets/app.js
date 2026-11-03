@@ -489,7 +489,13 @@ const writeUid = v => {
 };
 let uid = readUid(), syncState = 'idle', pushTimer = null, lastT = 0, pulling = false;
 const uurl = (id, sub = '') => `${SYNC_URL}/users/${encodeURIComponent(id)}${sub}.json`;
-const pack = () => ({ answers: store.answers, flags: store.flags, retry: store.retry, last: store.last });
+// Firebase 키에는 / . # $ [ ] 를 쓸 수 없어서 서버에 올릴 때만 %XX 로 바꾼다
+const kEnc = k => k.replace(/[%\/.#$\[\]]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+const kDec = k => k.replace(/%(25|2F|2E|23|24|5B|5D)/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+const mapK = (o, f) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [f(k), v]));
+const pack = () => ({ answers: mapK(store.answers, kEnc), flags: mapK(store.flags, kEnc), retry: mapK(store.retry, kEnc), last: store.last });
+const unpack = d => ({ ...d, answers: mapK(d?.answers, kDec), flags: mapK(d?.flags, kDec), retry: mapK(d?.retry, kDec) });
+const localPack = () => ({ answers: store.answers, flags: store.flags, retry: store.retry, last: store.last });
 function setSyncState(st) { syncState = st; const b = $('#loginBtn'); if (b) { b.dataset.state = uid ? st : 'off'; b.title = uid ? `${uid} · ${({ ok: '동기화됨', busy: '동기화 중…', err: '동기화 실패 (이 기기엔 저장됨)', idle: '로그인됨' })[st]}` : '로그인 (진도 동기화)'; } }
 function schedulePush() { if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = setTimeout(() => push(), 1500); }
 async function push(keep = false) {
@@ -497,7 +503,7 @@ async function push(keep = false) {
   const t = Date.now();
   try {
     const r = await fetch(uurl(uid), { method: 'PATCH', keepalive: keep, body: JSON.stringify({ data: pack(), t }) });
-    if (!r.ok) throw 0; lastT = t; setSyncState('ok');
+    if (!r.ok) { console.warn('sync push', r.status, await r.text()); throw 0; } lastT = t; setSyncState('ok');
   } catch { setSyncState('err'); }
 }
 const mergeStores = (remote, local) => {
@@ -511,8 +517,8 @@ async function pull(first = false) { // first: 로그인 직후 → 로컬과 �
   try {
     const r = await fetch(uurl(uid)); if (!r.ok) throw 0; const j = await r.json(); pulling = false;
     if (!j) { await push(); return true; } // 신규 가입: 지금 진도를 올린다
-    if (first) { applyRemote(mergeStores(j.data || {}, pack())); await push(); return true; }
-    if ((j.t || 0) > lastT) { lastT = j.t || 0; applyRemote(j.data || {}); setSyncState('ok'); return true; }
+    if (first) { applyRemote(mergeStores(unpack(j.data || {}), localPack())); await push(); return true; }
+    if ((j.t || 0) > lastT) { lastT = j.t || 0; applyRemote(unpack(j.data || {})); setSyncState('ok'); return true; }
     setSyncState('ok'); return false;
   } catch { pulling = false; setSyncState('err'); return false; }
 }
@@ -558,7 +564,7 @@ async function getAllUsers(force = false) {
 let rateMap = null;
 function buildRates() {
   rateMap = new Map();
-  for (const u of Object.values(allUsers || {})) for (const [k, v] of Object.entries(u?.data?.answers || {})) {
+  for (const u of Object.values(allUsers || {})) for (const [k, v] of Object.entries(unpack(u?.data || {}).answers)) {
     if (k.includes('#')) continue; // 오답 재풀이 기록 제외
     (rateMap.get(k) || rateMap.set(k, []).get(k)).push(v);
   }
@@ -583,7 +589,7 @@ async function viewPeople() {
   if (!users) { main.innerHTML = '<div class="wrap"><p class="empty">불러오지 못했어요.<br><br><a class="btn" href="#/people">다시 시도</a></p></div>'; return; }
   buildRates();
   const rows = Object.entries(users).map(([id, v]) => {
-    const ans = v?.data?.answers || {}; let done = 0, ok = 0;
+    const ans = unpack(v?.data || {}).answers; let done = 0, ok = 0;
     const per = units.map(u => { let d = 0, o = 0; for (const q of u.qs.values()) { const a = ans[`${u.key}|${q.id}`]; if (a != null) { d++; if (a === q.answer) o++; } } done += d; ok += o; return { u, d, o }; });
     return { id, t: v?.t || 0, done, ok, per };
   }).sort((a, b) => b.done - a.done || b.ok - a.ok);
