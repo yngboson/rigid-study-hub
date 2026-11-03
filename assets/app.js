@@ -477,7 +477,7 @@ $('#settingsBtn').onclick = () => {
 /* ───────── 아이디 로그인 · 진도 동기화 (비번 없음, 선택 기능) ─────────
    로그인하지 않으면 예전처럼 이 브라우저에만 저장된다. 아이디를 입력하면 진도(answers/flags/retry/last)를
    Firebase Realtime Database(REST)에 올려 기기 간 동기화한다. 설정(테마 등)은 기기별로 둔다. */
-const SYNC_URL = ''; // 예: 'https://내프로젝트-default-rtdb.firebaseio.com'  (끝에 / 없이)
+const SYNC_URL = 'https://rigidstudyhub-default-rtdb.asia-southeast1.firebasedatabase.app';
 const UID_KEY = 'rsh:uid', ID_RE = /^[0-9A-Za-z가-힣_-]{1,20}$/;
 const syncOn = !!SYNC_URL;
 const cookieGet = () => (document.cookie.match(/(?:^|; )rsh_uid=([^;]*)/) || [])[1];
