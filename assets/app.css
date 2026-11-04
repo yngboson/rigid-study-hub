@@ -180,14 +180,18 @@ mark, .hl {
 .reader.toc-hidden { grid-template-columns: minmax(0, 1fr); }
 .reader.toc-hidden .toc { display: none; }
 .toc-backdrop { display: none; }
+.toc-tab { display: none; }
 @media (max-width: 960px) {
   .reader, .reader.toc-hidden { grid-template-columns: minmax(0, 1fr); }
   .reader.toc-hidden .toc { display: block; }
   .toc { position: fixed; z-index: 40; top: 0; bottom: 0; left: 0; width: min(82vw, 320px); max-height: none; padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); background: var(--paper-hi); border-right: 1.5px solid var(--omr); box-shadow: 12px 0 36px -18px rgba(0,0,0,.45); transform: translateX(-102%); transition: transform .22s ease; visibility: hidden; }
   .toc.open { transform: none; visibility: visible; }
+  .toc-tab { display: flex; align-items: center; justify-content: center; position: fixed; z-index: 41; left: 0; top: 42%; width: 26px; height: 56px; padding: 0; margin-left: env(safe-area-inset-left); border: 1.5px solid var(--omr); border-left: 0; border-radius: 0 12px 12px 0; background: var(--paper-hi); color: var(--omr); font-size: 15px; line-height: 1; opacity: .8; cursor: pointer; box-shadow: 4px 2px 14px -6px rgba(0,0,0,.4); transition: left .22s ease, opacity .15s; }
+  .toc-tab:hover, .toc-tab:active { opacity: 1; }
+  .toc-tab.on { left: min(82vw, 320px); opacity: 1; }
   .toc-backdrop.open { display: block; position: fixed; z-index: 39; inset: 0; background: rgba(0,0,0,.35); }
 }
-@media (prefers-reduced-motion: reduce) { .toc { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .toc, .toc-tab { transition: none; } }
 .doc { max-width: 74ch; min-width: 0; }
 .doc section { scroll-margin-top: 76px; }
 .doc h2 { font-size: 1.45rem; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--ink); letter-spacing: -.02em; }
@@ -351,7 +355,7 @@ mark, .hl {
   :root:root { --paper:#fff; --paper-hi:#fff; --paper-lo:#eee; --ink:#000; --ink-2:#222; --ink-3:#444; --rule:#bbb; --mark:#FFE94D; color-scheme: light; }
   body { background:#fff; font-size: 12pt; }
   mark, .choice.right { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .topbar, .toc, .toc-backdrop, .omr-card, .q-actions, .toolbar, .tabs, .sheet, .toast, .skip, .sec-qs, .set-pick, .q-flag, .resume { display: none !important; }
+  .topbar, .toc, .toc-tab, .toc-backdrop, .omr-card, .q-actions, .toolbar, .tabs, .sheet, .toast, .skip, .sec-qs, .set-pick, .q-flag, .resume { display: none !important; }
   .wrap { padding: 0; max-width: none; }
   .doc { max-width: none; }
   .reader, .quiz-layout { display: block; }

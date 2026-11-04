@@ -186,6 +186,7 @@ async function viewRead(u, params) {
       <input class="search" id="q" type="search" placeholder="개념 검색 (용어, 키워드)" aria-label="개념 검색">
       <div class="seg" role="group" aria-label="형광펜 보기"><button data-m="show" aria-pressed="true">형광펜 보기</button><button data-m="hide" aria-pressed="false">가리기(암기)</button></div>
       <span class="grow"></span><span class="kbd" id="hitInfo"></span></div>
+    <button class="toc-tab" id="tocTab" aria-label="목차 열기" aria-controls="toc" aria-expanded="false"><span aria-hidden="true">☰</span></button>
     <div class="toc-backdrop" id="tocBd"></div><div class="reader" id="reader"><nav class="toc" id="toc" aria-label="목차">${toc(u.data.summary)}</nav>
     <article class="doc" id="doc">${u.data.summary.map(s => renderSection(u, s)).join('')}</article></div></div>`;
   const doc = $('#doc');
@@ -198,7 +199,8 @@ async function viewRead(u, params) {
   const mobile = () => matchMedia('(max-width:960px)').matches;
   const rd = $('#reader'), tocEl = $('#toc'), bd = $('#tocBd'), tb = $('#tocBtn');
   let hid = false; try { hid = localStorage.getItem('rsh:toc') === 'hidden'; } catch {}
-  const sync = () => { const open = mobile() ? tocEl.classList.contains('open') : !rd.classList.contains('toc-hidden'); tb.setAttribute('aria-expanded', open); bd.classList.toggle('open', mobile() && open); };
+  const sync = () => { const open = mobile() ? tocEl.classList.contains('open') : !rd.classList.contains('toc-hidden'); tb.setAttribute('aria-expanded', open); bd.classList.toggle('open', mobile() && open); const tt = $('#tocTab'); tt.setAttribute('aria-expanded', mobile() && open); tt.setAttribute('aria-label', mobile() && open ? '목차 닫기' : '목차 열기'); tt.classList.toggle('on', mobile() && open); };
+  $('#tocTab').onclick = () => { tocEl.classList.toggle('open'); sync(); };
   if (hid && !mobile()) rd.classList.add('toc-hidden');
   tb.onclick = () => {
     if (mobile()) tocEl.classList.toggle('open');
