@@ -165,7 +165,46 @@ def validate_unit(path, expect_id, errors, warnings):
             top, cnt = max(pos.items(), key=lambda kv: kv[1])
             if cnt / n > 0.4:
                 warnings.append(f"{name} 세트 {sid}: 정답 {top}번이 {cnt}/{n} ({cnt * 100 // n}%) 로 40% 초과")
+    _validate_cards(u.get("cards"), name, sec_ids, errors, warnings)
     return len(q_ids)
+
+
+def _validate_cards(cards, name, sec_ids, errors, warnings):
+    """플래시카드(선택): front 에 빈칸, answer 는 문자열(빈칸 1개) 또는 문자열 배열(㉠㉡ 순서)."""
+    if cards is None:
+        return
+    if not isinstance(cards, list) or not cards:
+        errors.append(f"{name}: cards 는 비어 있지 않은 배열이어야 합니다 (없으면 키를 빼세요)")
+        return
+    seen = set()
+    for c in cards:
+        cid = c.get("id") if isinstance(c, dict) else None
+        w = f"{name} 카드 {cid}"
+        if not cid:
+            errors.append(f"{name}: 카드 id 누락")
+            continue
+        if cid in seen:
+            errors.append(f"{w}: 카드 id 중복")
+        seen.add(cid)
+        front, ans = c.get("front"), c.get("answer")
+        if not isinstance(front, str) or not front.strip():
+            errors.append(f"{w}: front 누락")
+            continue
+        if c.get("ref") not in sec_ids:
+            errors.append(f"{w}: ref {c.get('ref')!r} 가 존재하는 섹션 id 가 아닙니다")
+        blanks = BLANK_RE.findall(front)
+        answers = ans if isinstance(ans, list) else [ans]
+        if not blanks:
+            errors.append(f"{w}: front 에 {{빈칸}} 또는 {{㉠}} 표기가 없습니다")
+        if not answers or not all(isinstance(a, str) and a.strip() for a in answers):
+            errors.append(f"{w}: answer 는 비어 있지 않은 문자열 또는 문자열 배열이어야 합니다")
+            continue
+        if blanks and len(blanks) != len(answers):
+            errors.append(f"{w}: 빈칸 {len(blanks)}개인데 answer 는 {len(answers)}개입니다")
+        elif len(blanks) > 1 and any(b == "빈칸" for b in blanks):
+            errors.append(f"{w}: 빈칸이 여러 개면 {{㉠}}{{㉡}} 로 표기하세요")
+        if any(a in front for a in answers):
+            warnings.append(f"{w}: 정답 {answers!r} 가 앞면에 그대로 나옵니다")
 
 
 BAD_EXT = {".pdf", ".ppt", ".pptx", ".hwp", ".hwpx", ".doc", ".docx"}

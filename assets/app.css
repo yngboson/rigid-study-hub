@@ -418,3 +418,47 @@ mark, .hl {
 .ppl ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .ppl li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: .9em; }
 .ppl li span { color: var(--ink-3); white-space: nowrap; }
+
+/* ---------- flashcards (빈칸 앞면 → 정답 뒷면) ---------- */
+.fc-tools .fc-sec { min-height: 38px; max-width: 100%; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-hi); color: var(--ink); font: inherit; font-size: .88em; }
+.fc-tools .seg small { margin-left: 3px; opacity: .7; font-weight: 500; }
+.fc-wrap { max-width: 720px; margin: 4px auto 0; }
+.fc-prog { margin-bottom: 14px; }
+.fc-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--paper-lo); }
+.fc-bar i { display: block; height: 100%; transition: width .25s ease; }
+.fc-bar .ok { background: var(--ok); } .fc-bar .no { background: var(--bad); }
+.fc-prog-row { display: flex; gap: 14px; align-items: baseline; margin-top: 8px; font-size: .88em; color: var(--ink-3); }
+.fc-prog-row .ok { color: var(--ok); } .fc-prog-row .no { color: var(--bad); }
+.fc-pos { margin-right: auto; color: var(--ink); } .fc-pos b { font-size: 1.15em; } .fc-pos em { font-style: normal; color: var(--ink-3); }
+.fc-card {
+  display: flex; flex-direction: column; justify-content: center; min-height: min(52vh, 360px); padding: 20px clamp(18px, 5vw, 40px) 24px;
+  border: 1.5px solid var(--ink); border-radius: 14px; background: var(--paper-hi); box-shadow: var(--shadow);
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.fc-card.is-back { border-color: var(--omr); }
+.fc-card.anim { animation: fcIn .22s ease; }
+@keyframes fcIn { from { transform: perspective(900px) rotateY(-70deg); opacity: .15; } to { transform: none; opacity: 1; } }
+.fc-tag { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 14px; font-size: .78em; color: var(--ink-3); }
+.fc-tag .kind { font-weight: 700; color: var(--ink-2); letter-spacing: .02em; }
+.fc-card.is-back .fc-tag .kind { color: var(--omr); }
+.fc-mark { margin-left: auto; padding: 0 9px; border-radius: 999px; font-weight: 700; }
+.fc-mark.ok { background: var(--ok-soft); color: var(--ok); } .fc-mark.no { background: var(--bad-soft); color: var(--bad); }
+.fc-text { margin: 0; font-size: 1.28em; line-height: 1.8; font-weight: 520; }
+.fc-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--paper-lo); color: var(--ink-2); font-size: .92em; }
+.fc-ref { margin-top: 16px; }
+.fc-hint { margin: 18px 0 0; text-align: center; color: var(--ink-3); font-size: .84em; }
+.fc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.fc-actions .btn { min-height: 56px; border-radius: 12px; font-size: 1.05em; font-weight: 700; }
+.fc-actions .fc-flip { grid-column: 1 / -1; }
+.fc-actions .fc-no { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+.fc-actions .fc-ok { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+.fc-nav { display: flex; justify-content: space-between; margin-top: 10px; }
+.fc-done { padding: 32px 16px; text-align: center; border: 1.5px dashed var(--rule); border-radius: 14px; background: var(--paper-hi); }
+.fc-done h2 { margin: 0 0 10px; }
+.fc-sum { display: flex; justify-content: center; gap: 28px; margin: 0; }
+.fc-sum span { display: grid; } .fc-sum small { color: var(--ink-3); } .fc-sum b { font-size: 1.6em; line-height: 1.2; }
+.fc-sum .ok b { color: var(--ok); } .fc-sum .no b { color: var(--bad); }
+.fc-done .btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
+@media (prefers-reduced-motion: reduce) { .fc-card.anim { animation: none; } .fc-bar i { transition: none; } }
+@media (max-width: 520px) { .fc-text { font-size: 1.18em; } .fc-tools .kbd { display: none; } }
+@media print { .fc-actions, .fc-nav { display: none; } }

@@ -5,12 +5,12 @@ const main = $('#main');
 
 /* ───────── 저장소 (진도는 이 브라우저에만 저장) ───────── */
 const KEY = 'rsh:v1';
-const defaults = { answers: {}, flags: {}, retry: {}, last: null, settings: { theme: 'auto', fs: 1, instant: true, shuffle: false } };
+const defaults = { answers: {}, flags: {}, retry: {}, cards: {}, last: null, settings: { theme: 'auto', fs: 1, instant: true, shuffle: false } };
 let store;
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 function normalize(raw) {
   const s = structuredClone(defaults); if (!isObj(raw)) return s;
-  for (const k of ['answers', 'flags', 'retry']) if (isObj(raw[k])) s[k] = raw[k];
+  for (const k of ['answers', 'flags', 'retry', 'cards']) if (isObj(raw[k])) s[k] = raw[k];
   if (isObj(raw.last)) s.last = raw.last;
   if (isObj(raw.settings)) s.settings = { ...defaults.settings, ...raw.settings };
   return s;
@@ -55,7 +55,8 @@ async function getUnit(cid, uid) {
   (function walk(list, depth, parent) { for (const s of list) { const o = { ...s, depth, parent }; sections.set(String(s.id), o); flat.push(o); walk(s.sections || [], depth + 1, o); } })(data.summary, 0, null);
   const qs = new Map(); let i = 0;
   for (const set of data.sets) { set.questions.forEach((q, n) => { q._set = set; q._n = n + 1; q._i = i++; qs.set(q.id, q); }); }
-  const u = { cid, uid, meta, data, sections, flat, qs, key: key, course: c };
+  const cards = Array.isArray(data.cards) ? data.cards : [];   // 플래시카드(선택)
+  const u = { cid, uid, meta, data, sections, flat, qs, cards, key: key, course: c };
   unitCache.set(key, u); return u;
 }
 
@@ -147,10 +148,10 @@ async function viewHome() {
     ${m.courses.map(c => `<section class="course"><h2>${esc(c.title)}${c.badge ? `<span class="cbadge">⚠ ${esc(c.badge)}</span>` : ''}</h2><div class="units">${c.units.map(meta => {
       const u = unitCache.get(`${c.id}/${meta.id}`); if (!u) return ''; const st = unitStats(u); const pct = x => (x / st.total * 100).toFixed(1);
       return `<article class="unit"><div><h3>${esc(meta.title)}</h3>${meta.subtitle ? `<p class="sub">${esc(meta.subtitle)}</p>` : ''}</div>
-      <div class="meta"><span class="chip">문제 ${st.total}</span><span class="chip">요약 ${u.flat.length}절</span>${(meta.tags || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')}<span class="chip">${esc(meta.updated || '')}</span></div>
+      <div class="meta"><span class="chip">문제 ${st.total}</span>${u.cards.length ? `<span class="chip">카드 ${u.cards.length}</span>` : ''}<span class="chip">요약 ${u.flat.length}절</span>${(meta.tags || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')}<span class="chip">${esc(meta.updated || '')}</span></div>
       <div><div class="meter" role="img" aria-label="정답 ${st.ok}, 오답 ${st.bad}, 전체 ${st.total}"><i class="m-ok" style="width:${pct(st.ok)}%"></i><i class="m-bad" style="width:${pct(st.bad)}%"></i></div>
       <div class="meter-label"><span>${st.done}/${st.total} 풀이</span><span>${st.done ? `정답 ${st.ok} · 오답 ${st.bad}` : '아직 안 풀었어요'}</span></div></div>
-      <div class="unit-actions"><a class="btn primary" href="#/${c.id}/${meta.id}/read">개념 읽기</a><a class="btn omr" href="#/${c.id}/${meta.id}/quiz">문제 풀기</a>${st.bad ? `<a class="btn" href="#/${c.id}/${meta.id}/review">오답 ${st.bad}</a>` : ''}</div></article>`;
+      <div class="unit-actions"><a class="btn primary" href="#/${c.id}/${meta.id}/read">개념 읽기</a>${u.cards.length ? `<a class="btn" href="#/${c.id}/${meta.id}/cards">플래시카드</a>` : ''}<a class="btn omr" href="#/${c.id}/${meta.id}/quiz">문제 풀기</a>${st.bad ? `<a class="btn" href="#/${c.id}/${meta.id}/review">오답 ${st.bad}</a>` : ''}</div></article>`;
     }).join('')}</div></section>`).join('')}
   </div>`;
   document.title = m.site?.title || 'Study Hub';
@@ -161,15 +162,17 @@ function unitHead(u, tab) {
   const base = `#/${u.cid}/${u.uid}`;
   const st = unitStats(u);
   const wrong = st.bad;
+  const cs = u.cards?.length ? cardStats(u) : null;
   return `<div class="unit-head"><div><h1>${esc(u.data.title)}</h1>${u.data.subtitle ? `<p>${esc(u.data.subtitle)}</p>` : ''}</div></div>
   <nav class="tabs" aria-label="단원 메뉴">
     <a href="${base}/read" ${tab === 'read' ? 'aria-current="page"' : ''}>개념 리더</a>
+    ${cs ? `<a href="${base}/cards" ${tab === 'cards' ? 'aria-current="page"' : ''}>플래시카드<span class="count">${cs.known}/${cs.total}</span></a>` : ''}
     <a href="${base}/quiz" ${tab === 'quiz' ? 'aria-current="page"' : ''}>문제풀이<span class="count">${st.done}/${st.total}</span></a>
     <a href="${base}/key" ${tab === 'key' ? 'aria-current="page"' : ''}>답지·해설</a>
     <a href="${base}/review" ${tab === 'review' ? 'aria-current="page"' : ''}>오답노트${wrong ? `<span class="count">${wrong}</span>` : ''}</a>
   </nav>`;
 }
-function remember(u, tab, href) { store.last = { unit: u.key, title: u.data.title + ' · ' + ({ read: '개념 리더', quiz: '문제풀이', key: '답지', review: '오답노트' }[tab]), href }; save(); }
+function remember(u, tab, href) { store.last = { unit: u.key, title: u.data.title + ' · ' + ({ read: '개념 리더', cards: '플래시카드', quiz: '문제풀이', key: '답지', review: '오답노트' }[tab]), href }; save(); }
 
 /* ───────── 화면: 개념 리더 ───────── */
 async function viewRead(u, params) {
@@ -395,6 +398,111 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 
+/* ───────── 화면: 플래시카드 (앞면 = 빈칸 문장, 뒷면 = 정답) ─────────
+   카드 기록: store.cards['<단원>|<카드id>'] = 1(알아요) | 2(헷갈려요). 형광펜 범위만 카드로 만든다(AUTHORING.md §3-2). */
+const cardKey = (u, c) => `${u.key}|${c.id}`;
+const cardOf = (u, c) => store.cards[cardKey(u, c)];
+function cardStats(u) {
+  let known = 0, unsure = 0; for (const c of u.cards) { const v = cardOf(u, c); if (v === 1) known++; else if (v === 2) unsure++; }
+  return { known, unsure, total: u.cards.length, todo: u.cards.length - known - unsure };
+}
+// 앞면의 빈칸 자리에 정답을 형광펜으로 채운 문장 (빈칸이 ㉠㉡ 이면 라벨도 같이 보여 준다)
+function cardBack(c) {
+  const ans = [].concat(c.answer); let k = 0;
+  return md(c.front.replace(/\{(빈칸|[㉠-㉭])\}/g, (_, l) => `==${l === '빈칸' ? '' : l + ' '}${ans[k++] ?? ''}==`));
+}
+const shuffled = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+let cardState = null;
+function cardsHref(u, { only = 'all', shuffle = false, ref = '' } = {}) {
+  const p = new URLSearchParams(); if (only !== 'all') p.set('only', only); if (shuffle) p.set('shuffle', '1'); if (ref) p.set('ref', ref);
+  const q = p.toString(); return `#/${u.cid}/${u.uid}/cards${q ? '?' + q : ''}`;
+}
+async function viewCards(u, params) {
+  setCrumbs([{ t: u.course.title + (u.course.badge ? ` ⚠ ${u.course.badge}` : ''), href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '플래시카드' }]);
+  document.title = u.data.title + ' · 플래시카드';
+  remember(u, 'cards', `#/${u.cid}/${u.uid}/cards`);
+  if (!u.cards.length) { main.innerHTML = `<div class="wrap">${unitHead(u, 'cards')}<p class="empty">이 단원에는 플래시카드가 없어요.</p></div>`; return; }
+  const only = ['unsure', 'todo'].includes(params.get('only')) ? params.get('only') : 'all';
+  const shuffle = params.get('shuffle') === '1'; const ref = params.get('ref') || '';
+  const inRef = c => !ref || String(c.ref) === ref || String(c.ref).startsWith(ref + '.');
+  let list = u.cards.filter(inRef);
+  if (only === 'unsure') list = list.filter(c => cardOf(u, c) === 2);
+  if (only === 'todo') list = list.filter(c => cardOf(u, c) == null);
+  if (shuffle) list = shuffled(list);
+  // 전체 보기에서는 아직 표시하지 않은 첫 카드부터 이어서 시작
+  const start = only === 'all' && !shuffle ? Math.max(0, list.findIndex(c => cardOf(u, c) == null)) : 0;
+  cardState = { u, list, i: start, flipped: false, only, shuffle, ref, anim: false };
+  const st = cardStats(u);
+  const secOpts = u.flat.map(s => { const n = u.cards.filter(c => String(c.ref) === String(s.id) || String(c.ref).startsWith(s.id + '.')).length; return n ? `<option value="${esc(s.id)}" ${s.id === ref ? 'selected' : ''}>${'  '.repeat(s.depth)}§${esc(s.id)} ${esc(s.title)} (${n})</option>` : ''; }).join('');
+  main.innerHTML = `<div class="wrap">${unitHead(u, 'cards')}
+    <div class="toolbar fc-tools">
+      <div class="seg" id="fcOnly" role="group" aria-label="카드 범위">
+        <button data-only="all" aria-pressed="${only === 'all'}">전체 <small>${u.cards.filter(inRef).length}</small></button>
+        <button data-only="unsure" aria-pressed="${only === 'unsure'}">헷갈려요 <small>${st.unsure}</small></button>
+        <button data-only="todo" aria-pressed="${only === 'todo'}">안 본 카드 <small>${st.todo}</small></button></div>
+      <select class="fc-sec" id="fcSec" aria-label="범위 선택"><option value="">전체 범위</option>${secOpts}</select>
+      <button class="btn sm" id="fcShuffle" aria-pressed="${shuffle}">섞기</button>
+      <span class="grow"></span><span class="kbd"><kbd>Space</kbd> 뒤집기 · <kbd>1</kbd> 헷갈려요 · <kbd>2</kbd> 알아요 · <kbd>←</kbd><kbd>→</kbd> 이동</span></div>
+    <div class="fc-wrap" id="fc"></div></div>`;
+  const go = o => { location.hash = cardsHref(u, { only, shuffle, ref, ...o }); };
+  $('#fcOnly').addEventListener('click', e => { const b = e.target.closest('[data-only]'); if (b) go({ only: b.dataset.only }); });
+  $('#fcSec').addEventListener('change', e => go({ ref: e.target.value }));
+  $('#fcShuffle').addEventListener('click', () => go({ shuffle: !shuffle }));
+  $('#fc').addEventListener('click', onCardClick);
+  renderCard();
+}
+function renderCard() {
+  const s = cardState, el = $('#fc'); if (!el) return; const { u, list, i, flipped } = s; const st = cardStats(u); const n = list.length;
+  if (!n) { el.innerHTML = `<p class="empty">${s.only === 'unsure' ? '헷갈린 카드가 없어요. 잘하고 있어요!' : s.only === 'todo' ? '안 본 카드가 없어요. 한 바퀴 다 돌았어요.' : '카드가 없어요.'}</p>`; return; }
+  if (i >= n) {
+    const k = list.filter(c => cardOf(u, c) === 1).length, w = list.filter(c => cardOf(u, c) === 2).length;
+    el.innerHTML = `<div class="fc-done"><h2>${w ? '한 바퀴 끝!' : '전부 알아요 🎉'}</h2><p class="fc-sum"><span class="ok"><small>알아요</small><b>${k}</b></span><span class="no"><small>헷갈려요</small><b>${w}</b></span><span><small>전체</small><b>${n}</b></span></p>
+      <div class="btns">${w ? `<a class="btn primary" href="${cardsHref(u, { only: 'unsure', ref: s.ref })}">헷갈려요 ${w}장 다시 보기</a>` : ''}<button class="btn" data-fc="restart">처음부터 다시</button><a class="btn omr" href="#/${u.cid}/${u.uid}/quiz">문제 풀러 가기</a><button class="btn ghost" data-fc="clear">이 단원 카드 기록 지우기</button></div></div>`;
+    return;
+  }
+  const c = list[i]; const v = cardOf(u, c); const sec = u.sections.get(String(c.ref));
+  el.innerHTML = `<div class="fc-prog"><div class="fc-bar" role="progressbar" aria-label="카드 진행" aria-valuemin="0" aria-valuemax="${st.total}" aria-valuenow="${st.known + st.unsure}"><i class="ok" style="width:${st.known / st.total * 100}%"></i><i class="no" style="width:${st.unsure / st.total * 100}%"></i></div>
+      <div class="fc-prog-row"><span class="fc-pos"><b>${i + 1}</b><em>/${n}</em></span><span class="ok">알아요 ${st.known}</span><span class="no">헷갈려요 ${st.unsure}</span></div></div>
+    <div class="fc-card ${flipped ? 'is-back' : ''} ${s.anim ? 'anim' : ''}" id="fcCard" role="button" tabindex="0" aria-label="${flipped ? '정답 면. 누르면 앞면으로' : '빈칸 문장. 누르면 정답을 봐요'}">
+      <div class="fc-tag"><span class="kind">${flipped ? '정답' : '빈칸 채우기'}</span><span>§${esc(c.ref)} ${esc(sec?.title || '')}</span>${v ? `<span class="fc-mark ${v === 1 ? 'ok' : 'no'}">${v === 1 ? '알아요' : '헷갈려요'}</span>` : ''}</div>
+      <p class="fc-text">${flipped ? cardBack(c) : md(c.front)}</p>
+      ${flipped && c.explanation ? `<p class="fc-note">${md(c.explanation)}</p>` : ''}
+      ${flipped ? `<div class="fc-ref"><button class="btn sm" data-fc="concept">개념 보기 §${esc(c.ref)}</button></div>` : '<p class="fc-hint">카드를 누르면 정답이 보여요</p>'}</div>
+    <div class="fc-actions">${flipped ? '<button class="btn fc-no" data-fc="unsure">헷갈려요</button><button class="btn fc-ok" data-fc="known">알아요</button>' : '<button class="btn primary fc-flip" data-fc="flip">정답 보기</button>'}</div>
+    <div class="fc-nav"><button class="btn sm ghost" data-fc="prev" ${i ? '' : 'disabled'}>‹ 이전</button><button class="btn sm ghost" data-fc="next">건너뛰기 ›</button></div>`;
+  s.anim = false;
+}
+function cardAct(act) {
+  const s = cardState; if (!s) return; const { u, list } = s; const c = list[s.i];
+  if (act === 'flip') { s.flipped = !s.flipped; s.anim = true; renderCard(); return; }
+  if (act === 'restart') { s.i = 0; s.flipped = false; renderCard(); return; }
+  if (act === 'clear') { if (!confirm('이 단원의 플래시카드 기록(알아요/헷갈려요)을 지울까요?')) return; for (const x of u.cards) delete store.cards[cardKey(u, x)]; save(); route(); return; }
+  if (!c && act !== 'prev') return;
+  if (act === 'known' || act === 'unsure') {
+    store.cards[cardKey(u, c)] = act === 'known' ? 1 : 2; save();
+    const t = $('.tabs a[aria-current] .count'); if (t) t.textContent = `${cardStats(u).known}/${u.cards.length}`;
+    s.i++; s.flipped = false; renderCard();
+  } else if (act === 'next') { s.i = Math.min(list.length, s.i + 1); s.flipped = false; renderCard(); }
+  else if (act === 'prev') { s.i = Math.max(0, s.i - 1); s.flipped = false; renderCard(); }
+  else if (act === 'concept') openSheet(`§${c.ref} ${u.sections.get(String(c.ref))?.title || ''}`, conceptHTML(u, c.ref));
+}
+function onCardClick(e) {
+  const b = e.target.closest('[data-fc]'); if (b) { cardAct(b.dataset.fc); return; }
+  if (e.target.closest('#fcCard')) cardAct('flip');
+}
+document.addEventListener('keydown', e => {
+  if (!cardState || !$('#fc') || !$('#sheet').hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.matches('input,textarea,select') || (e.target.closest('button,a') && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+  const { list, i, flipped } = cardState; if (!list.length) return;
+  if (e.key === ' ' || e.key === 'Enter') { if (i < list.length) cardAct('flip'); }
+  else if (e.key === '1' || e.key === '2') { if (i >= list.length) return; if (!flipped) cardAct('flip'); else cardAct(e.key === '1' ? 'unsure' : 'known'); }
+  else if (e.key === 'ArrowRight') cardAct('next');
+  else if (e.key === 'ArrowLeft') cardAct('prev');
+  else if (e.key === 'c' && i < list.length) cardAct('concept');
+  else return;
+  e.preventDefault();
+});
+
 /* ───────── 화면: 답지·해설 ───────── */
 async function viewKey(u, params) {
   setCrumbs([{ t: u.course.title + (u.course.badge ? ` ⚠ ${u.course.badge}` : ''), href: '#/' }, { t: u.data.title, href: `#/${u.cid}/${u.uid}/read` }, { t: '답지·해설' }]);
@@ -472,11 +580,11 @@ $('#settingsBtn').onclick = () => {
   const bind = (id, key, parse) => $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; store.settings[key] = parse(b.dataset.v); save(); applySettings(); $$('button', $(id)).forEach(x => x.setAttribute('aria-pressed', x === b)); if (key === 'instant') toast('다음 문제부터 적용돼요'); });
   bind('#sTheme', 'theme', v => v); bind('#sFs', 'fs', Number); bind('#sIn', 'instant', v => v === 'true');
   $('#sExp').onclick = () => { const blob = new Blob([JSON.stringify(store, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'study-hub-progress.json'; a.click(); };
-  $('#sRst').onclick = () => { if (confirm('풀이 기록, 오답, ★ 표시를 모두 지웁니다. 설정은 유지돼요.')) { store.answers = {}; store.flags = {}; store.retry = {}; store.last = null; save(); closeSheet(); route(); toast('기록을 지웠어요'); } };
+  $('#sRst').onclick = () => { if (confirm('풀이 기록, 오답, ★ 표시, 플래시카드 기록을 모두 지웁니다. 설정은 유지돼요.')) { store.answers = {}; store.flags = {}; store.retry = {}; store.cards = {}; store.last = null; save(); closeSheet(); route(); toast('기록을 지웠어요'); } };
 };
 
 /* ───────── 아이디 로그인 · 진도 동기화 (비번 없음, 선택 기능) ─────────
-   로그인하지 않으면 예전처럼 이 브라우저에만 저장된다. 아이디를 입력하면 진도(answers/flags/retry/last)를
+   로그인하지 않으면 예전처럼 이 브라우저에만 저장된다. 아이디를 입력하면 진도(answers/flags/retry/cards/last)를
    Firebase Realtime Database(REST)에 올려 기기 간 동기화한다. 설정(테마 등)은 기기별로 둔다. */
 const SYNC_URL = 'https://rigidstudyhub-default-rtdb.asia-southeast1.firebasedatabase.app';
 const UID_KEY = 'rsh:uid', ID_RE = /^[0-9A-Za-z가-힣_-]{1,20}$/;
@@ -493,9 +601,9 @@ const uurl = (id, sub = '') => `${SYNC_URL}/users/${encodeURIComponent(id)}${sub
 const kEnc = k => k.replace(/[%\/.#$\[\]]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
 const kDec = k => k.replace(/%(25|2F|2E|23|24|5B|5D)/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 const mapK = (o, f) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [f(k), v]));
-const pack = () => ({ answers: mapK(store.answers, kEnc), flags: mapK(store.flags, kEnc), retry: mapK(store.retry, kEnc), last: store.last });
-const unpack = d => ({ ...d, answers: mapK(d?.answers, kDec), flags: mapK(d?.flags, kDec), retry: mapK(d?.retry, kDec) });
-const localPack = () => ({ answers: store.answers, flags: store.flags, retry: store.retry, last: store.last });
+const pack = () => ({ answers: mapK(store.answers, kEnc), flags: mapK(store.flags, kEnc), retry: mapK(store.retry, kEnc), cards: mapK(store.cards, kEnc), last: store.last });
+const unpack = d => ({ ...d, answers: mapK(d?.answers, kDec), flags: mapK(d?.flags, kDec), retry: mapK(d?.retry, kDec), cards: mapK(d?.cards, kDec) });
+const localPack = () => ({ answers: store.answers, flags: store.flags, retry: store.retry, cards: store.cards, last: store.last });
 function setSyncState(st) { syncState = st; const b = $('#loginBtn'); if (b) { b.dataset.state = uid ? st : 'off'; b.title = uid ? `${uid} · ${({ ok: '동기화됨', busy: '동기화 중…', err: '동기화 실패 (이 기기엔 저장됨)', idle: '로그인됨' })[st]}` : '로그인 (진도 동기화)'; } }
 function schedulePush() { if (!uid || !syncOn) return; clearTimeout(pushTimer); pushTimer = setTimeout(() => push(), 300); } // 문제 하나 풀 때마다 거의 즉시 올린다
 let pushing = false, dirty = false;
@@ -511,11 +619,11 @@ async function push(keep = false) {
   pushing = false; if (dirty) { dirty = false; push(keep); }
 }
 const mergeStores = (remote, local) => {
-  const out = { answers: { ...(remote.answers || {}), ...local.answers }, flags: { ...(remote.flags || {}), ...local.flags }, retry: { ...(remote.retry || {}) }, last: local.last || remote.last || null };
+  const out = { answers: { ...(remote.answers || {}), ...local.answers }, flags: { ...(remote.flags || {}), ...local.flags }, retry: { ...(remote.retry || {}) }, cards: { ...(remote.cards || {}), ...(local.cards || {}) }, last: local.last || remote.last || null };
   for (const [k, v] of Object.entries(local.retry || {})) out.retry[k] = [...new Set([...(out.retry[k] || []), ...v])];
   return out;
 };
-const applyRemote = d => { const n = normalize({ ...d, settings: store.settings }); Object.assign(store, { answers: n.answers, flags: n.flags, retry: n.retry, last: n.last }); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
+const applyRemote = d => { const n = normalize({ ...d, settings: store.settings }); Object.assign(store, { answers: n.answers, flags: n.flags, retry: n.retry, cards: n.cards, last: n.last }); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
 async function pull(first = false) { // first: 로그인 직후 → 로컬과 병합, 이후: 서버가 더 새로우면 그대로 가져옴
   if (!uid || !syncOn || pulling) return false; pulling = true; setSyncState('busy');
   try {
@@ -619,6 +727,7 @@ async function route() {
     else {
       const u = await getUnit(seg[0], seg[1]); if (my !== routeSeq) return; const tab = seg[2] || 'read';
       if (tab === 'read') await viewRead(u, params);
+      else if (tab === 'cards') await viewCards(u, params);
       else if (tab === 'quiz') await viewQuiz(u, params);
       else if (tab === 'key') await viewKey(u, params);
       else if (tab === 'review') await viewReview(u);

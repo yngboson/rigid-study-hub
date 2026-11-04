@@ -4,6 +4,8 @@
 예)
   python3 tools/import_highlight_quiz.py SRC.json --course psych --course-title 심리학 \
       --unit midterm-2-6 --tags 중간고사 --sources a.pdf,b.pdf --date 2026-10-27
+
+SRC.json 에 "cards": [{"front": "...{빈칸}...", "answer": "정답", "ref": "1.2"}] 가 있으면 플래시카드도 함께 만든다.
 """
 import argparse
 import json
@@ -42,7 +44,7 @@ def convert(src, args):
                     "ref": str(q["ref"]),
                 })
             sets.append({"id": sid, "title": f"{label} {letter}", "kind": key, "questions": questions})
-    return {
+    unit = {
         "id": args.unit,
         "title": args.title or src.get("title", args.unit),
         "subtitle": args.subtitle if args.subtitle is not None else src.get("subtitle", ""),
@@ -50,6 +52,16 @@ def convert(src, args):
         "summary": src["summary"],
         "sets": sets,
     }
+    # 플래시카드(선택): [{front, answer, ref, explanation?}] → id 자동 부여
+    cards = []
+    for i, c in enumerate(src.get("cards") or [], 1):
+        card = {"id": f"card-{i:02d}", "front": c["front"], "answer": c["answer"], "ref": str(c["ref"])}
+        if c.get("explanation"):
+            card["explanation"] = c["explanation"]
+        cards.append(card)
+    if cards:
+        unit["cards"] = cards
+    return unit
 
 
 def upsert_manifest(unit, args):
@@ -123,7 +135,7 @@ def main():
     dump(out, unit)
     upsert_manifest(unit, args)
     n = sum(len(s["questions"]) for s in unit["sets"])
-    print(f"단원 파일 저장: {out.relative_to(ROOT)} (세트 {len(unit['sets'])}개, 문제 {n}개)")
+    print(f"단원 파일 저장: {out.relative_to(ROOT)} (세트 {len(unit['sets'])}개, 문제 {n}개, 카드 {len(unit.get('cards', []))}장)")
     print("매니페스트 갱신: content/index.json")
     sys.exit(V.report(*V.validate()))
 
