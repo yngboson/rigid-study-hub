@@ -25,13 +25,13 @@ const setAns = (u, qid, v) => { if (v == null) delete store.answers[`${u}|${qid}
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function md(text) {
   return esc(text)
-    .replace(/==(.+?)==/g, '<mark>$1</mark>')
+    .replace(/==(!?)(.+?)==/g, (_, ex, t) => ex ? `<mark class="exam">${t}</mark>` : `<mark>${t}</mark>`)
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
     .replace(/\{빈칸\}/g, '<span class="blank" aria-label="빈칸"></span>')
     .replace(/\{([㉠-㉭])\}/g, '<span class="blank lab">$1</span>')
     .replace(/\n/g, '<br>');
 }
-const plain = s => String(s).replace(/==|\*\*/g, '');
+const plain = s => String(s).replace(/==!?|\*\*/g, '');
 const CIRC = ['①', '②', '③', '④', '⑤', '⑥'];
 const pad = n => String(n).padStart(2, '0');
 const kindLabel = { fill_blank: '빈칸 채우기', case: '사례 적용', mcq: '문제' };
@@ -185,6 +185,7 @@ async function viewRead(u, params) {
       <button class="btn toc-toggle" id="tocBtn" aria-expanded="false" aria-controls="toc">☰ 목차</button>
       <input class="search" id="q" type="search" placeholder="개념 검색 (용어, 키워드)" aria-label="개념 검색">
       <div class="seg" role="group" aria-label="형광펜 보기"><button data-m="show" aria-pressed="true">형광펜 보기</button><button data-m="hide" aria-pressed="false">가리기(암기)</button></div>
+      ${JSON.stringify(u.data.summary).includes('==!') ? '<span class="legend" aria-label="형광펜 색 구분"><mark>강의록</mark><mark class="exam">기출</mark></span>' : ''}
       <span class="grow"></span><span class="kbd" id="hitInfo"></span></div>
     <button class="toc-tab" id="tocTab" aria-label="목차 열기" aria-controls="toc" aria-expanded="false"><span aria-hidden="true">☰</span></button>
     <div class="toc-backdrop" id="tocBd"></div><div class="reader" id="reader"><nav class="toc" id="toc" aria-label="목차">${toc(u.data.summary)}</nav>

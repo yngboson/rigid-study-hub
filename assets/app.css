@@ -13,6 +13,7 @@
   --omr-soft: #F7E3E7;
   --mark: #FFE94D;         /* 형광펜 */
   --mark-ink: #1D2433;
+  --exam: #FFB3CB;         /* 기출 형광펜 */
   --ok: #17795A;
   --ok-soft: #DDF1E9;
   --bad: #C4314B;
@@ -29,7 +30,7 @@
     --paper: #14181F; --paper-hi: #1C222C; --paper-lo: #232A36;
     --ink: #E6E9EE; --ink-2: #B3BAC7; --ink-3: #848D9E; --rule: #313949; --on-omr: #1A0A0E; --flag: #F2C14E;
     --omr: #E86A82; --omr-soft: #3A2129;
-    --mark: rgba(255, 226, 64, .32); --mark-ink: #FFF7C2;
+    --mark: rgba(255, 226, 64, .32); --mark-ink: #FFF7C2; --exam: rgba(255, 105, 160, .45);
     --ok: #4BC596; --ok-soft: #173329; --bad: #E86A82; --bad-soft: #3A2129;
     --focus: #8AA9FF; --shadow: 0 1px 0 rgba(0,0,0,.3), 0 10px 28px -14px rgba(0,0,0,.6);
     color-scheme: dark;
@@ -39,7 +40,7 @@
   --paper: #14181F; --paper-hi: #1C222C; --paper-lo: #232A36;
   --ink: #E6E9EE; --ink-2: #B3BAC7; --ink-3: #848D9E; --rule: #313949; --on-omr: #1A0A0E; --flag: #F2C14E;
   --omr: #E86A82; --omr-soft: #3A2129;
-  --mark: rgba(255, 226, 64, .32); --mark-ink: #FFF7C2;
+  --mark: rgba(255, 226, 64, .32); --mark-ink: #FFF7C2; --exam: rgba(255, 105, 160, .45);
   --ok: #4BC596; --ok-soft: #173329; --bad: #E86A82; --bad-soft: #3A2129;
   --focus: #8AA9FF; --shadow: 0 1px 0 rgba(0,0,0,.3), 0 10px 28px -14px rgba(0,0,0,.6);
   color-scheme: dark;
@@ -352,7 +353,7 @@ mark, .hl {
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media print {
-  :root:root { --paper:#fff; --paper-hi:#fff; --paper-lo:#eee; --ink:#000; --ink-2:#222; --ink-3:#444; --rule:#bbb; --mark:#FFE94D; color-scheme: light; }
+  :root:root { --paper:#fff; --paper-hi:#fff; --paper-lo:#eee; --ink:#000; --ink-2:#222; --ink-3:#444; --rule:#bbb; --mark:#FFE94D; --exam:#FFB3CB; color-scheme: light; }
   body { background:#fff; font-size: 12pt; }
   mark, .choice.right { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .topbar, .toc, .toc-tab, .toc-backdrop, .omr-card, .q-actions, .toolbar, .tabs, .sheet, .toast, .skip, .sec-qs, .set-pick, .q-flag, .resume { display: none !important; }
@@ -466,3 +467,8 @@ mark, .hl {
 @media (prefers-reduced-motion: reduce) { .fc-card.anim { animation: none; } .fc-bar i { transition: none; } }
 @media (max-width: 520px) { .fc-text { font-size: 1.18em; } .fc-tools .kbd { display: none; } }
 @media print { .fc-actions, .fc-nav { display: none; } }
+
+/* ---------- 기출 형광펜 (==!글==) ---------- */
+mark.exam { background: linear-gradient(transparent 12%, var(--exam) 12%, var(--exam) 88%, transparent 88%); }
+.hide-marks mark.exam.peek { background: linear-gradient(transparent 12%, var(--exam) 12%, var(--exam) 88%, transparent 88%); }
+.legend { display: inline-flex; gap: 6px; font-size: .78em; }
